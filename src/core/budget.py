@@ -1,6 +1,7 @@
 import threading
 import time
 from typing import Any
+import dspy
 
 class BudgetExceededError(Exception):
     """Raised when the token budget is exceeded."""
@@ -76,11 +77,15 @@ class BudgetManager:
             self.total_input_tokens = 0
             self.total_output_tokens = 0
 
-class BudgetWrapper:
+class BudgetWrapper(dspy.BaseLM):
     """
     Wraps a dspy.LM to enforce budget constraints.
     """
     def __init__(self, lm: Any, budget_manager: BudgetManager):
+        # Initialize BaseLM with the wrapped model's name or a default
+        model_name = getattr(lm, "model", "budget-wrapper")
+        super().__init__(model=model_name)
+
         self.lm = lm
         self.budget_manager = budget_manager
 
