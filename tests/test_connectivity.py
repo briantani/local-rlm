@@ -2,6 +2,7 @@ import pytest
 import dspy
 import os
 from src.config import get_lm
+from src.core.budget import BudgetWrapper
 
 def test_get_lm_gemini():
     """Test that we can initialize the Gemini provider."""
@@ -10,14 +11,19 @@ def test_get_lm_gemini():
     # For now, let's just check instantiation.
     try:
         lm = get_lm("gemini")
-        assert isinstance(lm, dspy.LM)
+        # It should be wrapped now
+        assert isinstance(lm, BudgetWrapper)
+        # And the underlying LM should be dspy.LM
+        assert isinstance(lm.lm, dspy.LM)
     except ValueError as e:
         pytest.skip(f"Skipping Gemini test: {e}")
 
 def test_get_lm_ollama():
     """Test that we can initialize the Ollama provider."""
     lm = get_lm("ollama")
-    assert isinstance(lm, dspy.LM)
+    assert isinstance(lm, BudgetWrapper)
+    assert isinstance(lm.lm, dspy.LM)
+
 
 @pytest.mark.asyncio
 async def test_connectivity_ollama():
