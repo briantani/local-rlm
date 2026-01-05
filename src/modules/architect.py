@@ -4,7 +4,7 @@ from typing import Literal
 class ArchitectSignature(dspy.Signature):
     """
     decides the best action to take for a given query.
-    1. 'CODE': For math, data processing, logic puzzles, or whenever the user asks for code/Python.
+    1. 'CODE': For math, data processing, logic puzzles, or whenever the user asks for code/Python. ALSO USE 'CODE' if the query asks for information found in a FILE listed in 'data_desc' (you must write code to read the file).
     2. 'ANSWER': For general knowledge, chit-chat, or IF the necessary information, result, or delegation output is already present in 'data_desc'. Choose this even if the query asks for code/delegation but the work is already done.
     3. 'DELEGATE': Exclusively when the user's task explicitly asks to "run in parallel", "split the task", or "delegate", AND the subtasks have not been executed yet.
     """
@@ -42,6 +42,11 @@ class Architect(dspy.Module):
             dspy.Example(
                 query="Analyze this large dataset of sales figures.",
                 data_desc="sales.csv with columns date, amount",
+                action="CODE"
+            ).with_inputs("query", "data_desc"),
+            dspy.Example(
+                query="What is the secret code in secret.txt?",
+                data_desc="AVAILABLE FILES:\n[FILE] secret.txt",
                 action="CODE"
             ).with_inputs("query", "data_desc"),
             dspy.Example(

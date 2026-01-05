@@ -161,3 +161,32 @@ Methodology: Iterative Sprints. Strict ATest-Driven Development (TDD). Stack: Py
 * [x] Sub-agents run in parallel.
 * [x] BudgetManager tracks costs across all threads correctly.
 * [x] System handles a large text summary by splitting it.
+
+## **📚 Phase 6: External Context & Document Ingestion**
+
+**Goal:** Allow the Agent to discover and read external files via the REPL (Tool-Use), efficiently extending context.
+
+### **📋 Implementation Steps**
+
+1.  **Dependency Installation**:
+    *   Install libraries required for the *REPL* to read files: `pandas`, `openpyxl`, `pypdf`, `python-docx`.
+2.  **File Explorer (`src/core/explorer.py`):**
+    *   Implement `scan_directory(path: Path) -> str`.
+    *   Returns a tree-like text structure or list of available files and their paths.
+    *   Does **NOT** load content.
+3.  **Context Integration:**
+    *   Update `RLMAgent.__init__` to accept `root_dir`.
+    *   Call `explorer.scan_directory` and inject the *file list* into `data_desc`.
+    *   **Crucial:** Ensure Prompts know that to *know* the content, they must generate code to *read* the content.
+
+### **✅ Verification (Tests)**
+
+* **Test 6.1 (Explorer):** Point to a temp folder and verify the string output lists files correctly.
+* **Test 6.2 (REPL Read):** Agent is given a folder with `secret.txt`. Task: "What is the secret?".
+    *   Expectation: Agent generates `open('secret.txt').read()`, executes it, sees the secret in REPL output, and answers.
+
+### **🛑 Definition of Done**
+
+* [ ] REPL environment has necessary libraries.
+* [ ] Agent receives file paths in context, not content.
+* [ ] Agent successfully writes code to read a file and answer a question based on it.

@@ -1,9 +1,11 @@
 import concurrent.futures
+from pathlib import Path
 from src.core.repl import PythonREPL
 from src.modules.architect import Architect
 from src.modules.coder import Coder
 from src.modules.responder import Responder
 from src.modules.delegator import Delegator
+from src.core.explorer import scan_directory
 
 class RLMAgent:
     """
@@ -11,10 +13,11 @@ class RLMAgent:
     Orchestrates the Architect, Coder, and REPL to solve tasks.
     Supports recursive delegation handling.
     """
-    def __init__(self, max_steps: int = 10, max_depth: int = 3, depth: int = 0):
+    def __init__(self, max_steps: int = 10, max_depth: int = 3, depth: int = 0, root_dir: str | Path | None = None):
         self.max_steps = max_steps
         self.max_depth = max_depth
         self.depth = depth
+        self.root_dir = Path(root_dir) if root_dir else None
 
         self.repl = PythonREPL()
         self.architect = Architect()
@@ -23,6 +26,15 @@ class RLMAgent:
         self.delegator = Delegator()
 
         self.history: list[tuple[str, str]] = [] # List of (Action/Code, Output)
+
+        # Initialize context with file listing if root_dir is provided
+        if self.root_dir and self.root_dir.exists():
+            file_structure = scan_directory(self.root_dir)
+            initial_context = (
+                f"AVAILABLE FILES (Use Python code to read them):\n{file_structure}\n"
+                f"NOTE: To access file content, you MUST generate Python code using open(), pd.read_csv(), etc."
+            )
+            self.history.append(("System Initialization", initial_context))
 
     def format_context(self) -> str:
         """Formats the execution history into a string context."""
