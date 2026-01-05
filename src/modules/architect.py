@@ -4,6 +4,9 @@ from typing import Literal
 class ArchitectSignature(dspy.Signature):
     """
     Decides the best action to take for a given query.
+    1. 'CODE': For math, data processing, logic puzzles, or whenever the user asks for code/Python.
+    2. 'ANSWER': For general knowledge, chit-chat, or IF the necessary information/result is already present in 'data_desc'.
+    3. 'DELEGATE': For extremely large or parallelizable tasks.
     """
     query = dspy.InputField(desc="The user's query or task.")
     data_desc = dspy.InputField(desc="Description of available data or context.", default="")
@@ -25,6 +28,16 @@ class Architect(dspy.Module):
                 query="Calculate the 100th Fibonacci number.",
                 data_desc="",
                 action="CODE"
+            ).with_inputs("query", "data_desc"),
+            dspy.Example(
+                query="Calculate the sum of 1 to 50 using Python.",
+                data_desc="",
+                action="CODE"
+            ).with_inputs("query", "data_desc"),
+            dspy.Example(
+                query="Calculate the sum of 1 to 50 using Python.",
+                data_desc="Step 1 Output: 1275",
+                action="ANSWER"
             ).with_inputs("query", "data_desc"),
             dspy.Example(
                 query="Analyze this large dataset of sales figures.",
