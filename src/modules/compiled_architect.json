@@ -1,0 +1,65 @@
+{
+  "decide.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "query": "What is 2 + 2?",
+        "data_desc": "Execution History:\n--- Step 1 ---\nInput: print(2+2)\nOutput: 4\n",
+        "reasoning": "The user's query is a simple arithmetic operation: \"What is 2 + 2?\". The execution history shows that this calculation has already been performed in Step 1, with the output being 4. Since the answer is explicitly visible in the provided `data_desc`, the best action is to provide the answer directly.",
+        "action": "ANSWER"
+      },
+      {
+        "augmented": true,
+        "query": "What is the first line of test.txt?",
+        "data_desc": "AVAILABLE FILES:\n[FILE] test.txt\nExecution History:\n",
+        "reasoning": "The user is asking for the first line of a specific file named 'test.txt'. Since the content of the file is not provided in 'data_desc', we need to read the file to determine its contents.",
+        "action": "CODE"
+      },
+      {
+        "augmented": true,
+        "query": "What is the first line of test.txt?",
+        "data_desc": "AVAILABLE FILES:\n[FILE] test.txt\nExecution History:\n--- Step 1 ---\nInput: print(open('test.txt').readline())\nOutput: # Hello World\n",
+        "reasoning": "The query asks for the first line of a file named 'test.txt'. According to the provided data description, there is an execution history that shows the content of 'test.txt' starting with '# Hello World'. Therefore, I can provide the answer without needing to read the file again.",
+        "action": "ANSWER"
+      },
+      {
+        "augmented": true,
+        "query": "Process these 5 items in parallel.",
+        "data_desc": "Execution History:\n",
+        "reasoning": "The query asks to process 5 items in parallel. Since there is no indication that subtasks have been executed yet, and the user explicitly asked to run tasks in parallel, the best action is to delegate the task.",
+        "action": "DELEGATE"
+      }
+    ],
+    "signature": {
+      "instructions": "decides the best action to take for a given query.\n1. 'CODE': For math, data processing, logic puzzles, or whenever the user asks for code/Python. CRITICAL: If the user asks about the *content* of a file listed in 'data_desc', you MUST choose 'CODE' to read it. You cannot know the content otherwise.\n2. 'ANSWER': For general knowledge, chit-chat, or IF the answer is EXPLICITLY visible in 'data_desc'. Do NOT guess file contents.\n3. 'DELEGATE': Exclusively when the user's task explicitly asks to \"run in parallel\", \"split the task\", or \"delegate\", AND the subtasks have not been executed yet.",
+      "fields": [
+        {
+          "prefix": "Query:",
+          "description": "The user's query or task."
+        },
+        {
+          "prefix": "Data Desc:",
+          "description": "Description of available data or context."
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Action:",
+          "description": "The best action to take: 'ANSWER', 'CODE', or 'DELEGATE'."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.0.4",
+      "cloudpickle": "3.1"
+    }
+  }
+}

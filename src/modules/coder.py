@@ -15,6 +15,20 @@ class Coder(dspy.Module):
         super().__init__()
         self.generate_code = dspy.ChainOfThought(CoderSignature)
 
+        # Add examples for file handling
+        self.generate_code.demos = [
+             dspy.Example(
+                task="Read the CSV file 'data/sales.csv' and show the first 5 rows",
+                context_summary="AVAILABLE FILES: [FILE] data/sales.csv",
+                python_code="import pandas as pd\ndf = pd.read_csv('data/sales.csv')\nprint(df.head())"
+            ).with_inputs("task", "context_summary"),
+            dspy.Example(
+                task="What is the text in 'document.pdf'?",
+                context_summary="AVAILABLE FILES: [FILE] document.pdf",
+                python_code="from pypdf import PdfReader\nreader = PdfReader('document.pdf')\ntext = ''\nfor page in reader.pages:\n    text += page.extract_text()\nprint(text[:500])"
+            ).with_inputs("task", "context_summary")
+        ]
+
     def forward(self, task: str, context_summary: str = "") -> dspy.Prediction:
         # Generate code
         prediction = self.generate_code(task=task, context_summary=context_summary)

@@ -13,6 +13,7 @@ def main():
     parser.add_argument("task", help="The natural language task to perform.")
     parser.add_argument("--provider", default="ollama", choices=["ollama", "gemini"], help="LLM provider to use.")
     parser.add_argument("--model", default=None, help="Specific model name (e.g., 'qwen2.5-coder:14b', 'gemini-1.5-pro').")
+    parser.add_argument("--context", default=None, help="Path to a directory containing files to include in the context.")
 
     args = parser.parse_args()
 
@@ -27,7 +28,7 @@ def main():
         return
 
     # 2. Initialize Agent
-    agent = RLMAgent(max_steps=5)
+    agent = RLMAgent(max_steps=5, root_dir=args.context)
 
     # 3. Run Task
     print(f"Starting Agent with task: '{args.task}'")

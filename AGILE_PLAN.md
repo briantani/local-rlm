@@ -187,6 +187,33 @@ Methodology: Iterative Sprints. Strict ATest-Driven Development (TDD). Stack: Py
 
 ### **🛑 Definition of Done**
 
-* [ ] REPL environment has necessary libraries.
-* [ ] Agent receives file paths in context, not content.
-* [ ] Agent successfully writes code to read a file and answer a question based on it.
+* [x] REPL environment has necessary libraries.
+* [x] Agent receives file paths in context, not content.
+* [x] Agent successfully writes code to read a file and answer a question based on it.
+
+## **🧠 Phase 7: Optimization with DSPy Compilation**
+
+**Goal:** Use `dspy.compile` (MIPRO or BootstrapFewShot) to stop infinite loops and improve reasoning by learning from examples instead of manual prompt engineering.
+
+### **📋 Implementation Steps**
+
+1.  **Training Data Construction (`src/optimization/data.py`):**
+    *   Create a dataset of `(task, context_state) -> action` examples.
+    *   Crucially include examples where context *already has the answer*, labeled as `ANSWER`.
+2.  **Optimization Script (`src/optimization/compile_architect.py`):**
+    *   Initialize `teleprompter = BootstrapFewShot(metric=validate_action)`.
+    *   Compile the `Architect` module.
+    *   Save the optimized program to `src/modules/compiled_architect.json`.
+3.  **Integration:**
+    *   Update `Architect.__init__` to load the compiled JSON if it exists.
+
+### **✅ Verification (Tests)**
+
+*   **Test 7.1:** Run the "First line of README" task. Verify it stops after reading.
+*   **Test 7.2:** Run the optimization script and verify a JSON file is produced.
+
+### **🛑 Definition of Done**
+
+*   [x] `compile_architect.py` runs successfully.
+*   [x] Agent loads optimized weights.
+*   [x] Infinite loop on file reading is resolved (Validated with `qwen2.5-coder`).
