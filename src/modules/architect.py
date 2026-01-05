@@ -3,10 +3,10 @@ from typing import Literal
 
 class ArchitectSignature(dspy.Signature):
     """
-    Decides the best action to take for a given query.
+    decides the best action to take for a given query.
     1. 'CODE': For math, data processing, logic puzzles, or whenever the user asks for code/Python.
-    2. 'ANSWER': For general knowledge, chit-chat, or IF the necessary information/result is already present in 'data_desc'.
-    3. 'DELEGATE': For extremely large or parallelizable tasks.
+    2. 'ANSWER': For general knowledge, chit-chat, or IF the necessary information, result, or delegation output is already present in 'data_desc'. Choose this even if the query asks for code/delegation but the work is already done.
+    3. 'DELEGATE': Exclusively when the user's task explicitly asks to "run in parallel", "split the task", or "delegate", AND the subtasks have not been executed yet.
     """
     query = dspy.InputField(desc="The user's query or task.")
     data_desc = dspy.InputField(desc="Description of available data or context.", default="")
@@ -44,11 +44,16 @@ class Architect(dspy.Module):
                 data_desc="sales.csv with columns date, amount",
                 action="CODE"
             ).with_inputs("query", "data_desc"),
-             dspy.Example(
-                query="Who won the super bowl in 2024?",
+            dspy.Example(
+                query="Run these 5 web searches in parallel.",
                 data_desc="",
-                action="DELEGATE" # Assuming DELEGATE implies search or external tool
-            ).with_inputs("query", "data_desc")
+                action="DELEGATE"
+            ).with_inputs("query", "data_desc"),
+            dspy.Example(
+                query="Run these 5 web searches in parallel.",
+                data_desc="Delegated Subtasks: [...] Results from sub-agents: Search 1: done...",
+                action="ANSWER"
+            ).with_inputs("query", "data_desc"),
         ]
 
     def forward(self, query: str, data_desc: str = "") -> dspy.Prediction:
