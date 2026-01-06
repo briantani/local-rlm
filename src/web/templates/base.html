@@ -26,17 +26,31 @@
     <nav class="bg-white shadow-sm border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <h1 class="text-2xl font-bold text-gray-900">
-                        🧠 RLM Agent
-                    </h1>
-                    <span class="ml-3 text-sm text-gray-500">
-                        Recursive Language Model
-                    </span>
+                <div class="flex items-center space-x-8">
+                    <a href="/" class="flex items-center">
+                        <h1 class="text-2xl font-bold text-gray-900">
+                            🧠 RLM Agent
+                        </h1>
+                        <span class="ml-3 text-sm text-gray-500">
+                            Recursive Language Model
+                        </span>
+                    </a>
+                    <!-- Navigation Links -->
+                    <div class="hidden md:flex items-center space-x-4">
+                        <a href="/" class="text-sm text-gray-600 hover:text-gray-900 transition">
+                            Home
+                        </a>
+                        <a href="/configs" class="text-sm text-gray-600 hover:text-gray-900 transition">
+                            Configurations
+                        </a>
+                        <a href="/configs/estimate" class="text-sm text-gray-600 hover:text-gray-900 transition">
+                            Cost Estimator
+                        </a>
+                    </div>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <div x-data="sessionStore" class="text-sm text-gray-600">
-                        Session: <span class="font-mono text-xs" x-text="sessionId.slice(0, 8)"></span>
+                    <div x-data class="text-sm text-gray-600">
+                        Session: <span class="font-mono text-xs" x-text="$store.sessionStore.sessionId ? $store.sessionStore.sessionId.slice(0, 8) : 'Loading...'"></span>
                     </div>
                 </div>
             </div>

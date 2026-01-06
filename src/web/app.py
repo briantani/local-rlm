@@ -82,10 +82,123 @@ def create_app() -> FastAPI:
     templates_path = Path(__file__).parent / "templates"
     templates = Jinja2Templates(directory=str(templates_path))
 
+    # Initialize services for routes
+    services = get_services()
+
     @app.get("/", tags=["UI"])
     async def index(request: Request):
         """Render the main UI page."""
         return templates.TemplateResponse("index.html", {"request": request})
+
+    @app.get("/configs", tags=["UI"])
+    async def configs_list(request: Request):
+        """Render the configurations list page."""
+        return templates.TemplateResponse("configs.html", {"request": request})
+
+    @app.get("/configs/estimate", tags=["UI"])
+    async def cost_estimator(request: Request):
+        """Render the cost estimator page."""
+        return templates.TemplateResponse("cost_estimator.html", {"request": request})
+
+    @app.get("/configs/compare", tags=["UI"])
+    async def configs_compare(request: Request, config: list[str] = []):
+        """Render the configuration comparison page."""
+        # Get config names from query params
+        config_names = request.query_params.getlist("config")
+
+        # Load the configurations
+        configs_data = []
+        for name in config_names:
+            try:
+                config_obj = services.config_service.get_profile(name)
+                if config_obj:
+                    # Enhance with metadata
+                    profile_dict = config_obj.dict()
+                    profile_dict["name"] = name
+
+                    # Get root and coder models
+                    profile_dict["root_model"] = profile_dict.get("root", {}).get("model", "Unknown")
+                    profile_dict["coder_model"] = profile_dict.get("modules", {}).get("coder", {}).get("model", "Unknown")
+                    profile_dict["delegate_model"] = profile_dict.get("delegate", {}).get("model", None)
+
+                    # Estimate cost
+                    provider = "local" if not config_obj.required_providers else "cloud"
+                    if provider == "local":
+                        profile_dict["cost_estimate"] = "Free"
+                    else:
+                        profile_dict["cost_estimate"] = "~$0.02/task"
+
+                    configs_data.append(profile_dict)
+            except Exception as e:
+                logger.warning(f"Failed to load config {name}: {e}")
+
+        return templates.TemplateResponse(
+            "config_compare.html",
+            {"request": request, "configs": configs_data}
+        )
+
+    @app.get("/configs/{name}", tags=["UI"])
+    async def config_detail(request: Request, name: str):
+        """Render the configuration detail page."""
+        from dataclasses import asdict
+        from pathlib import Path
+
+        try:
+            # Load the configuration
+            config = services.config_service.load_profile(name)
+            if not config:
+                return templates.TemplateResponse(
+                    "error.html",
+                    {"request": request, "error": "Configuration not found"},
+                    status_code=404
+                )
+
+            # Load YAML content
+            config_path = Path("configs") / f"{name}.yaml"
+            yaml_content = ""
+            if config_path.exists():
+                yaml_content = config_path.read_text()
+
+            # Prepare config data
+            profile_dict = asdict(config)
+            profile_dict["name"] = name
+            profile_dict["root_model"] = profile_dict.get("root", {}).get("model", "Unknown")
+            profile_dict["coder_model"] = profile_dict.get("modules", {}).get("coder", {}).get("model", "Unknown")
+            profile_dict["delegate_model"] = profile_dict.get("delegate", {}).get("model", None)
+
+            # Estimate cost
+            provider = "local" if not config.required_providers else "cloud"
+            if provider == "local":
+                profile_dict["cost_estimate"] = "Free"
+            else:
+                profile_dict["cost_estimate"] = "~$0.02/task"
+
+            # Extract modules info
+            modules_list = []
+            for module_name, module_config in profile_dict.get("modules", {}).items():
+                modules_list.append({
+                    "name": module_name,
+                    "model": module_config.get("model", "Unknown"),
+                    "provider": module_config.get("provider", "Unknown"),
+                    "temperature": module_config.get("temperature", 0.7)
+                })
+            profile_dict["modules"] = modules_list
+
+            return templates.TemplateResponse(
+                "config_detail.html",
+                {
+                    "request": request,
+                    "config": profile_dict,
+                    "yaml_content": yaml_content
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error loading config detail: {e}")
+            return templates.TemplateResponse(
+                "error.html",
+                {"request": request, "error": str(e)},
+                status_code=500
+            )
 
     @app.get("/health", tags=["Health"])
     async def health_check():

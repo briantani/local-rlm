@@ -149,7 +149,9 @@ The server runs in development mode with `--reload` flag, automatically restarti
 SQLite database is created at `data/rlm.db` (configurable in `database.py`).
 
 View database:
+
 ```bash
+
 sqlite3 data/rlm.db
 .schema
 SELECT * FROM tasks;
@@ -158,6 +160,7 @@ SELECT * FROM tasks;
 ## 📦 Dependencies
 
 Core dependencies (already in pyproject.toml):
+
 - `fastapi` - Web framework
 - `uvicorn` - ASGI server
 - `aiosqlite` - Async SQLite
@@ -166,17 +169,37 @@ Core dependencies (already in pyproject.toml):
 - `jinja2` - Template engine
 
 Frontend dependencies (CDN):
+
 - Tailwind CSS 3.x
 - HTMX 2.x
 - Alpine.js 3.x
 
-## 🚧 Future Enhancements (Phase 15+)
+## 🚧 Future Enhancements (Phase 16+)
 
-- [ ] Configuration comparison UI
-- [ ] Cost estimator widget
 - [ ] Chat interface for follow-up queries
-- [ ] Task history viewer
+- [ ] Task history viewer with search
 - [ ] Export results to file
+- [ ] Real-time collaboration features
+
+## ✅ Phase 15 Complete - Configuration Management
+
+New pages added:
+
+- `/configs` - Configuration list with search and filtering
+- `/configs/{name}` - Detailed configuration view with YAML
+- `/configs/compare` - Side-by-side comparison (2-3 configs)
+- `/configs/estimate` - Interactive cost estimator
+
+Features:
+
+- Search configurations by name/description
+- Filter by provider (local/gemini/openai/hybrid)
+- Select up to 3 configs for comparison
+- View full YAML configuration with copy button
+- Module breakdown table
+- Interactive cost calculator with complexity slider
+- Token usage estimates
+- Smart recommendations based on cost and quality
 
 ## 📄 License
 

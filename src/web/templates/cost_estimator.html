@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}Cost Estimator - RLM Agent{% endblock %}
+
+{% block content %}
+<div x-data="costEstimator()" x-init="init()" class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <div class="flex items-center space-x-3">
+                <a href="/configs" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                </a>
+                <h1 class="text-3xl font-bold text-gray-900">Cost Estimator</h1>
+            </div>
+            <p class="mt-2 text-gray-600">Estimate costs across different configuration profiles</p>
+        </div>
+    </div>
+
+    <!-- Input Form -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Task Parameters</h3>
+
+        <div class="space-y-4">
+            <!-- Task Description -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Task Description (optional)
+                </label>
+                <textarea
+                    x-model="taskDescription"
+                    rows="3"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Calculate fibonacci(100) and explain the algorithm"
+                ></textarea>
+            </div>
+
+            <!-- Complexity Slider -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Task Complexity
+                </label>
+                <div class="flex items-center space-x-4">
+                    <input
+                        type="range"
+                        x-model="complexity"
+                        min="1"
+                        max="10"
+                        step="1"
+                        class="flex-1"
+                        @input="estimate"
+                    />
+                    <span class="text-sm font-medium text-gray-900 w-20" x-text="complexityLabels[complexity]"></span>
+                </div>
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Simple</span>
+                    <span>Complex</span>
+                </div>
+            </div>
+
+            <!-- Expected Steps -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Expected Execution Steps
+                </label>
+                <input
+                    type="number"
+                    x-model.number="expectedSteps"
+                    min="1"
+                    max="50"
+                    @input="estimate"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p class="mt-1 text-xs text-gray-500">Average tasks take 3-5 steps</p>
+            </div>
+
+            <!-- Delegation -->
+            <div>
+                <label class="flex items-center space-x-2">
+                    <input
+                        type="checkbox"
+                        x-model="useDelegation"
+                        @change="estimate"
+                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm font-medium text-gray-700">Include delegation (parallel sub-tasks)</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cost Comparison Table -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Cost Estimates by Configuration</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Configuration</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provider</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Input Tokens</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Output Tokens</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Est. Cost</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                    <template x-for="estimate in estimates" :key="estimate.name">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="estimate.name"></div>
+                                <div class="text-xs text-gray-500" x-text="estimate.description"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600" x-text="estimate.provider"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-mono" x-text="estimate.inputTokens.toLocaleString()"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-mono" x-text="estimate.outputTokens.toLocaleString()"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
+                                <span
+                                    class="font-semibold"
+                                    :class="estimate.cost === 0 ? 'text-green-600' : 'text-gray-900'"
+                                    x-text="estimate.cost === 0 ? 'Free' : '$' + estimate.cost.toFixed(4)"
+                                ></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Summary Card -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Cheapest Option -->
+        <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+            <h4 class="text-sm font-medium text-green-900 mb-2">💚 Most Affordable</h4>
+            <div x-show="cheapestConfig" x-cloak>
+                <div class="text-2xl font-bold text-green-900" x-text="cheapestConfig?.name"></div>
+                <div class="text-sm text-green-700 mt-1" x-text="cheapestConfig?.cost === 0 ? 'Completely Free' : '$' + cheapestConfig?.cost.toFixed(4)"></div>
+            </div>
+        </div>
+
+        <!-- Average Cost -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h4 class="text-sm font-medium text-blue-900 mb-2">📊 Average Cost</h4>
+            <div class="text-2xl font-bold text-blue-900" x-text="'$' + averageCost.toFixed(4)"></div>
+            <div class="text-sm text-blue-700 mt-1">Across all configs</div>
+        </div>
+
+        <!-- Most Expensive -->
+        <div class="bg-orange-50 border border-orange-200 rounded-lg p-6">
+            <h4 class="text-sm font-medium text-orange-900 mb-2">💰 Highest Quality</h4>
+            <div x-show="expensiveConfig" x-cloak>
+                <div class="text-2xl font-bold text-orange-900" x-text="expensiveConfig?.name"></div>
+                <div class="text-sm text-orange-700 mt-1" x-text="'$' + expensiveConfig?.cost.toFixed(4)"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+        <h4 class="text-sm font-medium text-gray-900 mb-2">ℹ️ Estimation Notes</h4>
+        <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+            <li>Estimates are based on average token usage per step</li>
+            <li>Actual costs may vary based on task complexity and model responses</li>
+            <li>Local models (Ollama) have zero API costs but require local GPU resources</li>
+            <li>Delegation can significantly increase costs due to parallel execution</li>
+        </ul>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function costEstimator() {
+    return {
+        taskDescription: '',
+        complexity: 5,
+        expectedSteps: 3,
+        useDelegation: false,
+        configs: [],
+        estimates: [],
+
+        complexityLabels: {
+            1: 'Trivial',
+            2: 'Very Simple',
+            3: 'Simple',
+            4: 'Easy',
+            5: 'Moderate',
+            6: 'Medium',
+            7: 'Complex',
+            8: 'Hard',
+            9: 'Very Hard',
+            10: 'Expert'
+        },
+
+        async init() {
+            await this.loadConfigs();
+            this.estimate();
+        },
+
+        async loadConfigs() {
+            try {
+                const response = await fetch('/api/configs');
+                const data = await response.json();
+                // Handle both array and {profiles: [...], count: ...} response formats
+                this.configs = data.profiles || data;
+            } catch (e) {
+                console.error('Failed to load configs:', e);
+            }
+        },
+
+        estimate() {
+            const baseInputTokens = 500 + (this.complexity * 100);
+            const baseOutputTokens = 200 + (this.complexity * 50);
+
+            const tokensPerStep = {
+                input: baseInputTokens,
+                output: baseOutputTokens
+            };
+
+            // Calculate delegation multiplier
+            const delegationMultiplier = this.useDelegation ? 2.5 : 1;
+
+            this.estimates = this.configs.map(config => {
+                const totalInput = tokensPerStep.input * this.expectedSteps * delegationMultiplier;
+                const totalOutput = tokensPerStep.output * this.expectedSteps * delegationMultiplier;
+
+                // Estimate cost based on model
+                const cost = this.calculateCost(config, totalInput, totalOutput);
+
+                return {
+                    name: config.name,
+                    description: config.description,
+                    provider: this.detectProvider(config),
+                    inputTokens: Math.round(totalInput),
+                    outputTokens: Math.round(totalOutput),
+                    cost: cost
+                };
+            });
+        },
+
+        calculateCost(config, inputTokens, outputTokens) {
+            // Free for local-only configs
+            if (!config.required_providers || config.required_providers.length === 0) {
+                return 0;
+            }
+
+            const rootModel = config.root_model?.toLowerCase() || '';
+
+            // Gemini pricing (per 1M tokens)
+            if (rootModel.includes('flash')) {
+                return (inputTokens * 0.075 + outputTokens * 0.30) / 1_000_000;
+            }
+            if (rootModel.includes('pro')) {
+                return (inputTokens * 1.25 + outputTokens * 5.00) / 1_000_000;
+            }
+
+            // OpenAI pricing (per 1M tokens)
+            if (rootModel.includes('gpt-4o')) {
+                return (inputTokens * 2.50 + outputTokens * 10.00) / 1_000_000;
+            }
+            if (rootModel.includes('gpt-4')) {
+                return (inputTokens * 30.00 + outputTokens * 60.00) / 1_000_000;
+            }
+            if (rootModel.includes('gpt-3.5')) {
+                return (inputTokens * 0.50 + outputTokens * 1.50) / 1_000_000;
+            }
+
+            // Default estimate
+            return (inputTokens * 1.00 + outputTokens * 3.00) / 1_000_000;
+        },
+
+        detectProvider(config) {
+            const name = config.name.toLowerCase();
+            if (name.includes('local')) return 'Local (Ollama)';
+            if (name.includes('hybrid')) return 'Hybrid';
+            if (name.includes('gemini')) return 'Google Gemini';
+            if (name.includes('openai') || name.includes('gpt')) return 'OpenAI';
+
+            if (!config.required_providers || config.required_providers.length === 0) return 'Local (Ollama)';
+            if (config.required_providers.includes('Gemini')) return 'Google Gemini';
+            if (config.required_providers.includes('OpenAI')) return 'OpenAI';
+
+            return 'Hybrid';
+        },
+
+        get cheapestConfig() {
+            if (this.estimates.length === 0) return null;
+            return this.estimates.reduce((min, curr) => curr.cost < min.cost ? curr : min);
+        },
+
+        get expensiveConfig() {
+            if (this.estimates.length === 0) return null;
+            return this.estimates.reduce((max, curr) => curr.cost > max.cost ? curr : max);
+        },
+
+        get averageCost() {
+            if (this.estimates.length === 0) return 0;
+            const total = this.estimates.reduce((sum, est) => sum + est.cost, 0);
+            return total / this.estimates.length;
+        }
+    };
+}
+</script>
+{% endblock %}

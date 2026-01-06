@@ -1270,15 +1270,16 @@ CREATE TABLE tasks (
 * [x] Integration tests passing (22 web tests, 106 total)
 
 **Implemented Files:**
-- `src/web/app.py` - FastAPI application factory with lifespan handler
-- `src/web/dependencies.py` - Dependency injection with service container
-- `src/web/database.py` - Async SQLite with aiosqlite for task persistence
-- `src/web/task_runner.py` - Async task execution with pub/sub streaming
-- `src/web/routes/sessions.py` - Session and API key endpoints
-- `src/web/routes/configs.py` - Configuration profile endpoints
-- `src/web/routes/tasks.py` - Task CRUD with background execution
-- `src/web/websocket/stream.py` - WebSocket endpoint for real-time updates
-- `tests/test_web.py` - Comprehensive test suite (22 tests)
+
+* `src/web/app.py` - FastAPI application factory with lifespan handler
+* `src/web/dependencies.py` - Dependency injection with service container
+* `src/web/database.py` - Async SQLite with aiosqlite for task persistence
+* `src/web/task_runner.py` - Async task execution with pub/sub streaming
+* `src/web/routes/sessions.py` - Session and API key endpoints
+* `src/web/routes/configs.py` - Configuration profile endpoints
+* `src/web/routes/tasks.py` - Task CRUD with background execution
+* `src/web/websocket/stream.py` - WebSocket endpoint for real-time updates
+* `tests/test_web.py` - Comprehensive test suite (22 tests)
 
 ---
 
@@ -1329,19 +1330,21 @@ src/web/
 * [x] Result display with cost breakdown
 
 **Implemented Files:**
-- `src/web/templates/base.html` - Base template with Tailwind, HTMX, Alpine.js
-- `src/web/templates/index.html` - Main task runner page with WebSocket integration
-- `src/web/templates/components/api_key_modal.html` - API key configuration modal
-- `src/web/static/css/app.css` - Custom styles
-- Updated `src/web/app.py` - Added Jinja2Templates and home route
+
+* `src/web/templates/base.html` - Base template with Tailwind, HTMX, Alpine.js
+* `src/web/templates/index.html` - Main task runner page with WebSocket integration
+* `src/web/templates/components/api_key_modal.html` - API key configuration modal
+* `src/web/static/css/app.css` - Custom styles
+* Updated `src/web/app.py` - Added Jinja2Templates and home route
 
 **UI Features:**
-- Session management in localStorage
-- Dynamic config selection with required API key detection
-- Real-time step-by-step execution display
-- WebSocket streaming of code, output, and results
-- Cost breakdown display
-- Mobile-responsive design with Tailwind CSS
+
+* Session management in localStorage
+* Dynamic config selection with required API key detection
+* Real-time step-by-step execution display
+* WebSocket streaming of code, output, and results
+* Cost breakdown display
+* Mobile-responsive design with Tailwind CSS
 
 ---
 
@@ -1358,9 +1361,29 @@ src/web/
 
 ### **🛑 Definition of Done**
 
-* [ ] Profile list with filtering
-* [ ] Detail view with YAML display
-* [ ] Cost estimator widget
+* [x] Profile list with filtering
+* [x] Detail view with YAML display
+* [x] Cost estimator widget
+
+**Implemented Files:**
+
+* `src/web/templates/configs.html` - Configuration list with search and provider filtering
+* `src/web/templates/config_detail.html` - Detailed view with YAML content and module breakdown
+* `src/web/templates/config_compare.html` - Side-by-side comparison of 2-3 configurations
+* `src/web/templates/cost_estimator.html` - Interactive cost estimation tool
+* Updated `src/web/templates/base.html` - Added navigation links
+* Updated `src/web/app.py` - Added UI routes for configs
+
+**UI Features:**
+
+* Configuration grid with provider badges and cost estimates
+* Search and filter by provider (local/gemini/openai/hybrid)
+* Comparison selector (up to 3 configs)
+* Full YAML display with copy functionality
+* Model breakdown table
+* Interactive cost estimator with complexity slider
+* Token usage and cost calculation per profile
+* Recommendations based on cost and quality
 
 ---
 

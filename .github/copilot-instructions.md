@@ -103,6 +103,22 @@ uv run pytest -k "test_code"      # Run tests matching pattern
 
 **Testing Strategy**: Unit tests use dependency injection (see `tests/conftest.py` for `MockArchitect`, `MockCoder`, etc.). Integration tests hit real LLMs (use `@pytest.mark.integration`).
 
+### Code Quality
+
+**IMPORTANT**: After completing each task or making changes to Python code, ALWAYS run:
+
+```bash
+uvx ruff check --fix    # Auto-fix linting issues
+```
+
+**Markdown Quality** (optional, if markdownlint is installed): After modifying any `.md` file, you can run:
+
+```bash
+npx markdownlint "**/*.md" "#node_modules"    # Check markdown formatting
+```
+
+All Python code must pass ruff checks before committing or marking a task complete.
+
 ### DSPy Module Compilation
 
 Compile modules with training data to improve performance:
