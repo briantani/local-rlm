@@ -29,6 +29,38 @@
                 </p>
             </div>
 
+            <!-- Template Selector (Optional) -->
+            <div>
+                <label for="template" class="block text-sm font-medium text-gray-700 mb-2">
+                    Load from Template (Optional)
+                    <span class="text-gray-500 text-xs">— Start with a saved configuration</span>
+                </label>
+                <div class="flex space-x-2">
+                    <select
+                        id="template"
+                        x-model="selectedTemplate"
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        :disabled="isRunning"
+                    >
+                        <option value="">No template (manual entry)</option>
+                        <template x-for="template in templates" :key="template.id">
+                            <option :value="template.id" x-text="`${template.name} — ${template.description}`"></option>
+                        </template>
+                    </select>
+                    <button
+                        type="button"
+                        @click="applyTemplate"
+                        class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400 transition"
+                        :disabled="!selectedTemplate || isRunning"
+                    >
+                        Apply
+                    </button>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">
+                    📚 Templates let you reuse successful task configurations. Save one from a completed task result!
+                </p>
+            </div>
+
             <!-- Task Input -->
             <div>
                 <label for="task" class="block text-sm font-medium text-gray-700 mb-2">
@@ -42,25 +74,6 @@
                     placeholder="e.g., Calculate the 100th fibonacci number"
                     :disabled="isRunning"
                 ></textarea>
-            </div>
-            <!-- Context Path (Optional) -->
-            <div>
-                <label for="contextPath" class="block text-sm font-medium text-gray-700 mb-2">
-                    Context Folder (Optional)
-                    <span class="text-gray-500 text-xs">— Absolute path to folder with files the agent can access</span>
-                </label>
-                <input
-                    id="contextPath"
-                    x-model="contextPath"
-                    type="text"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., /Users/yourname/data or C:\\Projects\\data"
-                    :disabled="isRunning"
-                />
-                <p class="mt-1 text-xs text-gray-500">
-                    💡 Agent can read files using Python code (e.g., <code class="bg-gray-100 px-1 rounded">pd.read_csv('data.csv')</code>).
-                    Folder contents will be listed at the start of execution.
-                </p>
             </div>
             <!-- Context Path (Optional) -->
             <div>
@@ -156,28 +169,10 @@
             </div>
         </div>
 
-        <!-- Final Result -->
-        <div x-show="result" x-cloak class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                ✅ Result
-            </h3>
-
-            <div class="prose max-w-none">
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p class="text-gray-900" x-text="result?.answer"></p>
-                </div>
-
-                <!-- Cost Breakdown -->
-                <div x-show="result?.cost" x-cloak class="mt-4 text-sm text-gray-600">
-                    <div class="flex items-center justify-between">
-                        <span>💰 Cost:</span>
-                        <span class="font-mono" x-text="'$' + (result?.cost || 0).toFixed(4)"></span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span>⏱️ Duration:</span>
-                        <span x-text="result?.duration"></span>
-                    </div>
-                </div>
+        <!-- Final Result - Canvas View -->
+        <div x-show="result" x-cloak>
+            <div :data-result="JSON.stringify(result)" :data-task-id="taskId">
+                {% include 'components/canvas.html' %}
             </div>
         </div>
 
@@ -212,6 +207,10 @@ function taskRunner() {
         configDetails: '',
         requiredProviders: [],
 
+        // Template state
+        templates: [],
+        selectedTemplate: '',
+
         // Task state
         taskText: '',
         contextPath: '',
@@ -229,6 +228,7 @@ function taskRunner() {
 
         async init() {
             await this.loadConfigs();
+            await this.loadTemplates();
         },
 
         async loadConfigs() {
@@ -253,6 +253,51 @@ function taskRunner() {
                 if (data.length > 0) {
                     this.selectedConfig = data[0].name;
                     await this.onConfigChange();
+                }
+            } catch (e) {
+                console.error('Failed to load configs:', e);
+            }
+        },
+
+        async loadTemplates() {
+            try {
+                const response = await fetch('/api/templates');
+                const data = await response.json();
+                this.templates = data;
+            } catch (e) {
+                console.error('Failed to load templates:', e);
+                this.templates = [];
+            }
+        },
+
+        async applyTemplate() {
+            if (!this.selectedTemplate) return;
+
+            try {
+                const response = await fetch(`/api/templates/${this.selectedTemplate}/apply`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) throw new Error('Failed to apply template');
+
+                const data = await response.json();
+
+                // Apply template data to form
+                this.taskText = data.task_text;
+                this.contextPath = data.context_path || '';
+                this.selectedConfig = data.config_name;
+
+                // Update config details
+                await this.onConfigChange();
+
+                alert('Template applied successfully!');
+            } catch (e) {
+                console.error('Apply template failed:', e);
+                alert('Failed to apply template: ' + e.message);
+            }
+        },
+
+        async onConfigChange() {
                 }
             } catch (e) {
                 console.error('Failed to load configs:', e);

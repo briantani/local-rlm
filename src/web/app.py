@@ -73,9 +73,12 @@ def create_app() -> FastAPI:
     app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
     app.include_router(stream.router, tags=["WebSocket"])
 
-    # Import chat router
-    from src.web.routes import chat
+    # Import chat, export, and share routers
+    from src.web.routes import chat, export, share, templates
     app.include_router(chat.router, tags=["Chat"])
+    app.include_router(export.router, tags=["Export"])
+    app.include_router(share.router, tags=["Share"])
+    app.include_router(templates.router, tags=["Templates"])
 
     # Mount static files (for Phase 14)
     static_path = Path(__file__).parent / "static"

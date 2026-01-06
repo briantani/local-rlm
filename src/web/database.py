@@ -81,6 +81,32 @@ class ChatMessage:
         }
 
 
+@dataclass
+class TaskTemplate:
+    """Database record for a task template."""
+    id: int
+    name: str
+    description: str
+    task_template: str  # Template text with placeholders
+    config_name: str
+    context_path: str | None
+    created_at: datetime
+    session_id: str | None  # Optional: restrict to creator
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "task_template": self.task_template,
+            "config_name": self.config_name,
+            "context_path": self.context_path,
+            "created_at": self.created_at.isoformat(),
+            "session_id": self.session_id,
+        }
+
+
 async def init_db():
     """Initialize the database with required tables."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -121,6 +147,43 @@ async def init_db():
         await db.execute("""
             CREATE INDEX IF NOT EXISTS idx_chat_task
             ON chat_messages(task_id, timestamp)
+        """)
+
+        # Share tokens table (Phase 17)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS share_tokens (
+                token TEXT PRIMARY KEY,
+                task_id TEXT NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP,
+                FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            )
+        """)
+
+        # Index for token lookup
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_share_token_task
+            ON share_tokens(task_id)
+        """)
+
+        # Task templates table (Phase 17)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS task_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                task_template TEXT NOT NULL,
+                config_name TEXT NOT NULL,
+                context_path TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                session_id TEXT
+            )
+        """)
+
+        # Index for template lookup
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_templates_session
+            ON task_templates(session_id)
         """)
 
         await db.commit()
@@ -346,3 +409,206 @@ def _row_to_chat_message(row: aiosqlite.Row) -> ChatMessage:
         timestamp=datetime.fromisoformat(row["timestamp"]),
     )
 
+
+# =============================================================================
+# Share Tokens (Phase 17)
+# =============================================================================
+
+
+async def create_share_token(task_id: str, token: str) -> str:
+    """
+    Create a shareable token for a task.
+
+    Args:
+        task_id: Task identifier
+        token: Unique share token
+
+    Returns:
+        The created token
+    """
+    now = datetime.now()
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO share_tokens (token, task_id, created_at)
+            VALUES (?, ?, ?)
+            """,
+            (token, task_id, now),
+        )
+        await db.commit()
+
+    logger.info(f"Created share token for task {task_id}")
+    return token
+
+
+async def get_task_by_share_token(token: str) -> TaskRecord | None:
+    """
+    Get task by share token.
+
+    Args:
+        token: Share token
+
+    Returns:
+        TaskRecord if found, None otherwise
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """
+            SELECT t.* FROM tasks t
+            INNER JOIN share_tokens st ON t.id = st.task_id
+            WHERE st.token = ?
+            """,
+            (token,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return _row_to_record(row)
+    return None
+
+
+# =============================================================================
+# Task Templates (Phase 17)
+# =============================================================================
+
+
+async def create_template(
+    name: str,
+    description: str,
+    task_template: str,
+    config_name: str,
+    context_path: str | None = None,
+    session_id: str | None = None,
+) -> TaskTemplate:
+    """
+    Create a new task template.
+
+    Args:
+        name: Template name
+        description: Template description
+        task_template: Task text (can include placeholders)
+        config_name: Configuration profile name
+        context_path: Optional context folder path
+        session_id: Optional session ID to restrict access
+
+    Returns:
+        Created TaskTemplate
+    """
+    now = datetime.now()
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+            INSERT INTO task_templates (name, description, task_template, config_name, context_path, created_at, session_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (name, description, task_template, config_name, context_path, now, session_id),
+        )
+        template_id = cursor.lastrowid
+        await db.commit()
+
+    logger.info(f"Created template: {name}")
+    return TaskTemplate(
+        id=template_id,
+        name=name,
+        description=description,
+        task_template=task_template,
+        config_name=config_name,
+        context_path=context_path,
+        created_at=now,
+        session_id=session_id,
+    )
+
+
+async def list_templates(session_id: str | None = None) -> list[TaskTemplate]:
+    """
+    List all templates, optionally filtered by session.
+
+    Args:
+        session_id: Optional session ID to filter by
+
+    Returns:
+        List of TaskTemplates
+    """
+    templates = []
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        if session_id:
+            # Get session-specific templates + public templates (session_id is NULL)
+            query = """
+                SELECT * FROM task_templates
+                WHERE session_id = ? OR session_id IS NULL
+                ORDER BY created_at DESC
+            """
+            params = (session_id,)
+        else:
+            # Get all public templates
+            query = """
+                SELECT * FROM task_templates
+                WHERE session_id IS NULL
+                ORDER BY created_at DESC
+            """
+            params = ()
+
+        async with db.execute(query, params) as cursor:
+            async for row in cursor:
+                templates.append(_row_to_template(row))
+
+    return templates
+
+
+async def get_template(template_id: int) -> TaskTemplate | None:
+    """
+    Get a template by ID.
+
+    Args:
+        template_id: Template ID
+
+    Returns:
+        TaskTemplate if found, None otherwise
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM task_templates WHERE id = ?",
+            (template_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return _row_to_template(row)
+    return None
+
+
+async def delete_template(template_id: int) -> bool:
+    """
+    Delete a template.
+
+    Args:
+        template_id: Template ID
+
+    Returns:
+        True if deleted, False if not found
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "DELETE FROM task_templates WHERE id = ?",
+            (template_id,),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+def _row_to_template(row: aiosqlite.Row) -> TaskTemplate:
+    """Convert a database row to TaskTemplate."""
+    return TaskTemplate(
+        id=row["id"],
+        name=row["name"],
+        description=row["description"],
+        task_template=row["task_template"],
+        config_name=row["config_name"],
+        context_path=row["context_path"],
+        created_at=datetime.fromisoformat(row["created_at"]),
+        session_id=row["session_id"],
+    )

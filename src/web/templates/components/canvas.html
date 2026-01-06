@@ -1,0 +1,305 @@
+<!-- Canvas Component for Rich Task Result Display -->
+<!-- Phase 17: Canvas & Export Features -->
+
+<div x-data="canvasViewer()" class="bg-white rounded-lg shadow-lg overflow-hidden">
+    <!-- Canvas Header -->
+    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 class="text-lg font-semibold text-white">Task Result</h3>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center space-x-2">
+                <button
+                    @click="saveAsTemplate()"
+                    class="px-3 py-1 bg-yellow-500/80 hover:bg-yellow-500 text-white rounded text-sm transition flex items-center space-x-1"
+                    title="Save as template for reuse"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                    <span>Save Template</span>
+                </button>
+
+                <button
+                    @click="exportMarkdown()"
+                    class="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded text-sm transition flex items-center space-x-1"
+                    title="Export to Markdown"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                    </svg>
+                    <span>Markdown</span>
+                </button>
+
+                <button
+                    @click="exportJSON()"
+                    class="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded text-sm transition flex items-center space-x-1"
+                    title="Export to JSON"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                    </svg>
+                    <span>JSON</span>
+                </button>
+
+                <button
+                    @click="shareTask()"
+                    class="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded text-sm transition flex items-center space-x-1"
+                    title="Share this result"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    <span>Share</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canvas Content -->
+    <div class="p-6 space-y-6">
+        <!-- Final Answer Section -->
+        <div class="border-l-4 border-green-500 bg-green-50 p-6 rounded-r-lg">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div class="ml-4 flex-1">
+                    <h4 class="text-lg font-semibold text-green-900 mb-2">Final Answer</h4>
+                    <div class="prose max-w-none text-gray-800" x-html="formatMarkdown(result?.answer || '')"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Execution Timeline -->
+        <div class="border-t pt-6">
+            <h4 class="text-md font-semibold text-gray-900 mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Execution Timeline
+            </h4>
+
+            <div class="space-y-4">
+                <template x-for="(step, index) in executionHistory" :key="index">
+                    <div class="relative pl-8 pb-4 border-l-2 border-gray-200 last:border-l-0">
+                        <!-- Timeline Dot -->
+                        <div class="absolute left-0 top-0 -ml-2 w-4 h-4 rounded-full bg-indigo-600"></div>
+
+                        <!-- Step Card -->
+                        <div class="bg-gray-50 rounded-lg p-4 hover:shadow-md transition">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-gray-700">
+                                    Step <span x-text="index + 1"></span>:
+                                    <span class="text-indigo-600" x-text="step.action"></span>
+                                </span>
+                                <span class="text-xs text-gray-500" x-text="step.timestamp || 'Just now'"></span>
+                            </div>
+
+                            <!-- Input -->
+                            <template x-if="step.input">
+                                <div class="mb-2">
+                                    <div class="text-xs font-medium text-gray-600 mb-1">Input:</div>
+                                    <div class="bg-white border border-gray-200 rounded p-2 text-sm text-gray-700" x-text="truncate(step.input, 200)"></div>
+                                </div>
+                            </template>
+
+                            <!-- Output/Code -->
+                            <template x-if="step.output">
+                                <div>
+                                    <div class="text-xs font-medium text-gray-600 mb-1">Output:</div>
+                                    <pre class="bg-gray-900 text-gray-100 rounded p-3 text-xs overflow-x-auto"><code x-text="step.output"></code></pre>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Metadata Section -->
+        <div class="border-t pt-6">
+            <h4 class="text-md font-semibold text-gray-900 mb-4">Execution Details</h4>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <div class="text-xs text-blue-600 font-medium mb-1">Total Cost</div>
+                    <div class="text-lg font-bold text-blue-900" x-text="'$' + (result?.total_cost || 0).toFixed(4)"></div>
+                </div>
+                <div class="bg-purple-50 rounded-lg p-4">
+                    <div class="text-xs text-purple-600 font-medium mb-1">Duration</div>
+                    <div class="text-lg font-bold text-purple-900" x-text="(result?.duration_seconds || 0).toFixed(1) + 's'"></div>
+                </div>
+                <div class="bg-green-50 rounded-lg p-4">
+                    <div class="text-xs text-green-600 font-medium mb-1">Steps</div>
+                    <div class="text-lg font-bold text-green-900" x-text="result?.step_count || 0"></div>
+                </div>
+                <div class="bg-amber-50 rounded-lg p-4">
+                    <div class="text-xs text-amber-600 font-medium mb-1">Config</div>
+                    <div class="text-sm font-bold text-amber-900 truncate" x-text="result?.config_name || 'N/A'"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Breakdown -->
+        <div x-show="result?.model_breakdown && Object.keys(result.model_breakdown).length > 0" class="border-t pt-6">
+            <h4 class="text-md font-semibold text-gray-900 mb-4">Model Usage</h4>
+            <div class="space-y-2">
+                <template x-for="(cost, model) in result?.model_breakdown" :key="model">
+                    <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                        <span class="text-sm text-gray-700 font-medium" x-text="model"></span>
+                        <span class="text-sm text-gray-900 font-bold" x-text="'$' + cost.toFixed(4)"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function canvasViewer() {
+    return {
+        result: null,
+        executionHistory: [],
+        taskId: null,
+
+        init() {
+            // Get data from parent component
+            this.result = this.$el.dataset.result ? JSON.parse(this.$el.dataset.result) : null;
+            this.executionHistory = this.result?.execution_history || [];
+            this.taskId = this.$el.dataset.taskId;
+        },
+
+        formatMarkdown(text) {
+            if (!text) return '';
+
+            // Simple markdown-like formatting
+            return text
+                .replace(/\n/g, '<br>')
+                .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 rounded text-sm">$1</code>')
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        },
+
+        truncate(text, length) {
+            if (!text) return '';
+            return text.length > length ? text.substring(0, length) + '...' : text;
+        },
+
+        async exportMarkdown() {
+            if (!this.taskId) return;
+
+            try {
+                const response = await fetch(`/api/tasks/${this.taskId}/export/markdown`);
+                if (!response.ok) throw new Error('Export failed');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `task_${this.taskId}.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (e) {
+                console.error('Markdown export failed:', e);
+                alert('Failed to export to Markdown');
+            }
+        },
+
+        async exportJSON() {
+            if (!this.taskId) return;
+
+            try {
+                const response = await fetch(`/api/tasks/${this.taskId}/export/json`);
+                if (!response.ok) throw new Error('Export failed');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `task_${this.taskId}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (e) {
+                console.error('JSON export failed:', e);
+                alert('Failed to export to JSON');
+            }
+        },
+
+        async shareTask() {
+            if (!this.taskId) return;
+
+            try {
+                const response = await fetch(`/api/tasks/${this.taskId}/share`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) throw new Error('Share failed');
+
+                const data = await response.json();
+                const shareUrl = `${window.location.origin}/share/${data.share_token}`;
+
+                // Copy to clipboard
+                await navigator.clipboard.writeText(shareUrl);
+
+                // Show success message
+                alert(`Shareable link copied to clipboard!\n\n${shareUrl}`);
+            } catch (e) {
+                console.error('Share failed:', e);
+                alert('Failed to create shareable link');
+            }
+        },
+
+        async saveAsTemplate() {
+            if (!this.taskId) return;
+
+            // Prompt user for template details
+            const name = prompt('Enter a name for this template:');
+            if (!name) return;
+
+            const description = prompt('Enter a description (optional):') || '';
+
+            try {
+                // Get the original task data
+                const taskResponse = await fetch(`/api/tasks/${this.taskId}`);
+                if (!taskResponse.ok) throw new Error('Failed to load task data');
+
+                const taskData = await taskResponse.json();
+
+                // Create the template
+                const response = await fetch('/api/templates', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        description: description,
+                        task_text: taskData.task_text,
+                        config_name: taskData.config_name,
+                        context_path: taskData.context_path
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to save template');
+
+                const template = await response.json();
+                alert(`Template "${name}" saved successfully! (ID: ${template.id})`);
+            } catch (e) {
+                console.error('Save template failed:', e);
+                alert('Failed to save template: ' + e.message);
+            }
+        }
+    };
+}
+</script>
