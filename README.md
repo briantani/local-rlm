@@ -173,6 +173,133 @@ For local Qwen models, use Ollama (Option 1) with `qwen2.5-coder`. For cloud acc
 
 ---
 
+## Advanced Configuration
+
+### Environment Variables (`.env` file)
+
+The agent supports extensive configuration through a `.env` file. Copy `.env.example` to `.env` and customize:
+
+```bash
+cp .env.example .env
+```
+
+#### Budget Control
+
+Prevent runaway API costs by setting spending limits:
+
+```bash
+# Maximum budget per task in USD (default: $1.00)
+MAX_BUDGET_USD=1.00
+
+# Pricing per 1M tokens (adjust for your provider)
+INPUT_PRICE_PER_1M=0.075   # Gemini 2.0 Flash default
+OUTPUT_PRICE_PER_1M=0.30   # Gemini 2.0 Flash default
+```
+
+**How it works:** The `BudgetManager` tracks token usage and raises `BudgetExceededError` when the limit is reached, preventing further API calls.
+
+#### Agent Behavior
+
+Control how the agent explores solutions:
+
+```bash
+# Maximum steps per agent execution (default: 10)
+# Prevents infinite loops in CODE → EXECUTE → DECIDE cycles
+MAX_AGENT_STEPS=10
+
+# Maximum recursion depth for task delegation (default: 3)
+# Controls how deep sub-task delegation can go
+MAX_RECURSION_DEPTH=3
+```
+
+**CLI Overrides:** You can override these per-run:
+```bash
+uv run python src/main.py "complex task" --max-steps 20 --max-depth 5
+```
+
+#### DSPy Retry Configuration
+
+When code generation fails validation (e.g., syntax errors), DSPy automatically retries:
+
+```bash
+# Maximum retries for DSPy assertions (default: 3)
+MAX_DSPY_RETRIES=3
+```
+
+**How it works:** DSPy's `ChainOfThought` modules use assertions to validate outputs. If validation fails (e.g., `ast.parse()` raises `SyntaxError`), DSPy re-prompts the LLM with the error message up to `MAX_DSPY_RETRIES` times.
+
+### Handling Large Files
+
+The agent has built-in strategies for processing large files or datasets:
+
+#### 1. **Automatic Task Delegation**
+When the `Architect` module detects a task is too complex or involves too much data, it can choose the `DELEGATE` action:
+
+- **Breaks down** the task into smaller sub-tasks
+- **Executes in parallel** using `ThreadPoolExecutor`
+- **Aggregates results** back to the main agent
+
+**Example:** "Analyze 1000 log files and find errors"
+- The agent delegates to sub-agents, each processing a chunk of files
+- Results are merged into a final summary
+
+#### 2. **Programmatic Chunking via Code**
+The agent can generate Python code to chunk large files:
+
+```python
+# Example code the agent might generate:
+import pandas as pd
+
+# Read large CSV in chunks
+chunk_size = 10000
+results = []
+
+for chunk in pd.read_csv('huge_file.csv', chunksize=chunk_size):
+    # Process each chunk
+    summary = chunk.describe()
+    results.append(summary)
+
+# Combine results
+final_summary = pd.concat(results).mean()
+print(final_summary)
+```
+
+#### 3. **Context Window Management**
+The agent's `format_context()` method maintains execution history. For very long histories:
+- Consider increasing `MAX_AGENT_STEPS` to give the agent more opportunities
+- Or use the `DELEGATE` action to offload work to sub-agents with fresh context
+
+#### 4. **No Separate Search Tool Needed**
+The agent can already:
+- Use Python's `grep`, `re`, or file I/O to search files
+- Generate code to parse JSON, XML, CSV, Excel, etc.
+- Call external APIs or databases via generated code
+
+**Example Task:** "Find all TODO comments in this codebase"
+```bash
+uv run python src/main.py "Find all TODO comments" --context /path/to/code
+```
+
+The agent will generate code like:
+```python
+import os
+import re
+
+todos = []
+for root, dirs, files in os.walk('.'):
+    for file in files:
+        if file.endswith('.py'):
+            with open(os.path.join(root, file)) as f:
+                for i, line in enumerate(f):
+                    if 'TODO' in line:
+                        todos.append(f"{file}:{i+1}: {line.strip()}")
+
+for todo in todos:
+    print(todo)
+```
+
+---
+
 ## Usage
 
 ### Basic Syntax
@@ -189,6 +316,8 @@ uv run python src/main.py "<your task>" --provider <provider> [--model <model>] 
 | `--provider` | LLM provider: `ollama`, `gemini`, `openai` | `ollama` |
 | `--model` | Specific model name (optional) | Provider default |
 | `--context` | Path to a directory with files to include | None |
+| `--max-steps` | Maximum agent execution steps (overrides `.env`) | 10 |
+| `--max-depth` | Maximum recursion depth (overrides `.env`) | 3 |
 
 ### Examples
 

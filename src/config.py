@@ -5,6 +5,29 @@ from src.core.budget import BudgetManager, BudgetWrapper
 
 load_dotenv()
 
+
+def get_config(key: str, default=None, cast_type=None):
+    """
+    Helper to get configuration from environment variables with type casting.
+
+    Args:
+        key: Environment variable name
+        default: Default value if not found
+        cast_type: Type to cast to (int, float, bool, etc.)
+
+    Returns:
+        The configuration value, cast to the appropriate type
+    """
+    value = os.getenv(key, default)
+    if value is None:
+        return None
+    if cast_type is bool:
+        return value.lower() in ("true", "1", "yes")
+    if cast_type is not None:
+        return cast_type(value)
+    return value
+
+
 def get_lm(provider_name: str, model_name: str = None) -> dspy.LM:
     """
     Factory function to get the Language Model provider.
@@ -20,7 +43,16 @@ def get_lm(provider_name: str, model_name: str = None) -> dspy.LM:
     Raises:
         ValueError: If the provider is not supported.
     """
-    budget_manager = BudgetManager()
+    # Load budget configuration from environment
+    max_budget = get_config("MAX_BUDGET_USD", 1.0, float)
+    input_price = get_config("INPUT_PRICE_PER_1M", 0.075, float)
+    output_price = get_config("OUTPUT_PRICE_PER_1M", 0.30, float)
+
+    # Initialize budget manager with configured values
+    budget_manager = BudgetManager(max_budget=max_budget)
+    budget_manager.input_price_per_1m = input_price
+    budget_manager.output_price_per_1m = output_price
+
     lm = None
 
     match provider_name.lower():
