@@ -190,12 +190,14 @@ function taskRunner() {
             try {
                 const response = await fetch('/api/configs');
                 const data = await response.json();
-                this.configs = data;
+                // Handle both array and {profiles: [...], count: ...} response formats
+                const configsList = data.profiles || data;
+                this.configs = configsList;
 
                 // Populate select options
                 const select = document.getElementById('config');
                 select.innerHTML = '<option value="">Select a configuration...</option>';
-                data.forEach(config => {
+                configsList.forEach(config => {
                     const option = document.createElement('option');
                     option.value = config.name;
                     option.textContent = `${config.name} - ${config.description}`;

@@ -103,6 +103,37 @@ uv run pytest -k "test_code"      # Run tests matching pattern
 
 **Testing Strategy**: Unit tests use dependency injection (see `tests/conftest.py` for `MockArchitect`, `MockCoder`, etc.). Integration tests hit real LLMs (use `@pytest.mark.integration`).
 
+### Web UI Testing & Bug Prevention
+
+**Test-Driven Bug Fixing**: When encountering a UI bug, follow this process:
+
+1. **Replicate the bug** in the test environment (`tests/test_web_ui.py`)
+2. **Create a failing test** that demonstrates the bug
+3. **Fix the bug** in the source code
+4. **Verify the test passes** and guards against regression
+5. **Extend the test** to similar cases (other routes, pages, API endpoints)
+6. **Check for the same pattern** in related code to prevent similar bugs
+
+**Example**: If you find that `/api/configs` returns `{profiles: [...]}` but JavaScript expects an array:
+
+- Add test: `test_configs_api_returns_profiles_array()`
+- Fix API or JavaScript handling
+- Check if `/configs`, `/configs/estimate`, home page have the same issue
+- Add tests for all affected pages
+
+**Test Coverage Areas**:
+
+- API response format validation (`test_configs_api_returns_profiles_array`)
+- Page rendering and HTTP status codes
+- JavaScript integration (Alpine.js, HTMX, fetch calls)
+- Error handling (404, 500, missing data)
+- Template data passing (request, context variables)
+
+**Current Test Files**:
+
+- `tests/test_web.py` - FastAPI backend API endpoints (22 tests)
+- `tests/test_web_ui.py` - UI pages, templates, and JavaScript integration (23 tests)
+
 ### Code Quality
 
 **IMPORTANT**: After completing each task or making changes to Python code, ALWAYS run:

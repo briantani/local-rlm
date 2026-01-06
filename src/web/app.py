@@ -88,17 +88,17 @@ def create_app() -> FastAPI:
     @app.get("/", tags=["UI"])
     async def index(request: Request):
         """Render the main UI page."""
-        return templates.TemplateResponse("index.html", {"request": request})
+        return templates.TemplateResponse(request, "index.html")
 
     @app.get("/configs", tags=["UI"])
     async def configs_list(request: Request):
         """Render the configurations list page."""
-        return templates.TemplateResponse("configs.html", {"request": request})
+        return templates.TemplateResponse(request, "configs.html")
 
     @app.get("/configs/estimate", tags=["UI"])
     async def cost_estimator(request: Request):
         """Render the cost estimator page."""
-        return templates.TemplateResponse("cost_estimator.html", {"request": request})
+        return templates.TemplateResponse(request, "cost_estimator.html")
 
     @app.get("/configs/compare", tags=["UI"])
     async def configs_compare(request: Request, config: list[str] = []):
@@ -133,8 +133,9 @@ def create_app() -> FastAPI:
                 logger.warning(f"Failed to load config {name}: {e}")
 
         return templates.TemplateResponse(
+            request,
             "config_compare.html",
-            {"request": request, "configs": configs_data}
+            {"configs": configs_data}
         )
 
     @app.get("/configs/{name}", tags=["UI"])
@@ -148,8 +149,9 @@ def create_app() -> FastAPI:
             config = services.config_service.load_profile(name)
             if not config:
                 return templates.TemplateResponse(
+                    request,
                     "error.html",
-                    {"request": request, "error": "Configuration not found"},
+                    {"error": "Configuration not found"},
                     status_code=404
                 )
 
@@ -167,7 +169,8 @@ def create_app() -> FastAPI:
             profile_dict["delegate_model"] = profile_dict.get("delegate", {}).get("model", None)
 
             # Estimate cost
-            provider = "local" if not config.required_providers else "cloud"
+            required_providers = services.config_service.get_required_providers(name)
+            provider = "local" if not required_providers else "cloud"
             if provider == "local":
                 profile_dict["cost_estimate"] = "Free"
             else:
@@ -185,9 +188,9 @@ def create_app() -> FastAPI:
             profile_dict["modules"] = modules_list
 
             return templates.TemplateResponse(
+                request,
                 "config_detail.html",
                 {
-                    "request": request,
                     "config": profile_dict,
                     "yaml_content": yaml_content
                 }
@@ -195,8 +198,9 @@ def create_app() -> FastAPI:
         except Exception as e:
             logger.error(f"Error loading config detail: {e}")
             return templates.TemplateResponse(
+                request,
                 "error.html",
-                {"request": request, "error": str(e)},
+                {"error": str(e)},
                 status_code=500
             )
 
