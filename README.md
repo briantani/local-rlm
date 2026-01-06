@@ -61,172 +61,200 @@ uv sync
 
 ## Configuration
 
-### Option 1: Local Execution with Ollama (Recommended for Privacy)
+The agent uses **YAML configuration profiles** for all settings. This provides a clean, version-controllable way to manage different use cases (cost-effective, high-quality, local-only, etc.).
 
-1. **Install Ollama**
-   - **macOS/Linux**: Download from [ollama.ai](https://ollama.ai/)
-   - **Windows**: Download the Windows installer from [ollama.ai](https://ollama.ai/)
+### Step 1: Set Up API Keys (Optional)
 
-2. **Pull a coding model:**
+For cloud providers (Gemini, OpenAI), create a `.env` file in the project root:
+
+**macOS/Linux:**
+```bash
+echo "GEMINI_API_KEY=your-key-here" > .env
+echo "OPENAI_API_KEY=your-key-here" >> .env
+```
+
+**Windows:**
+```powershell
+echo "GEMINI_API_KEY=your-key-here" | Out-File -FilePath .env -Encoding utf8
+echo "OPENAI_API_KEY=your-key-here" | Out-File -FilePath .env -Append -Encoding utf8
+```
+
+### Step 2: Choose a Configuration Profile
+
+The `configs/` directory contains pre-configured profiles:
+
+| Profile | Description | Best For |
+|---------|-------------|----------|
+| **`local-only.yaml`** | Free Ollama models only | Privacy, offline work, no API costs |
+| **`cost-effective.yaml`** | Gemini 2.5 Flash | Low-cost cloud tasks |
+| **`paper-gpt5.yaml`** | GPT-5 (root) + GPT-5-mini (delegates) | Replicating paper results |
+| **`high-quality.yaml`** | GPT-5.2 flagship | Maximum capability |
+| **`hybrid.yaml`** | Ollama for code, Gemini for reasoning | Best of both worlds |
+
+### Step 3: Run the Agent
+
+```bash
+uv run python src/main.py "<your task>" --config configs/<profile>.yaml
+```
+
+#### Example: Local Execution (No API Keys Needed)
+
+1. **Install Ollama** from [ollama.ai](https://ollama.ai/)
+2. **Pull a model:**
    ```bash
-   # Recommended: Qwen 2.5 Coder (14B parameters)
-   ollama pull qwen2.5-coder:14b
-
-   # Alternative: Smaller model for limited hardware
    ollama pull qwen2.5-coder:7b
-
-   # Alternative: Llama 3
-   ollama pull llama3:8b
    ```
-
-3. **Start the Ollama server:**
-   - **macOS/Linux**: `ollama serve`
-   - **Windows**: Ollama runs as a background service automatically after installation
-
-4. **Run the agent:**
+3. **Run with local-only profile:**
    ```bash
-   uv run python src/main.py "Calculate the 100th Fibonacci number" --provider ollama
+   uv run python src/main.py "Calculate the 100th Fibonacci number" --config configs/local-only.yaml
    ```
 
-### Option 2: Google Gemini (Cloud)
+#### Example: Cloud Execution (Gemini)
 
-1. **Get an API key** from [Google AI Studio](https://aistudio.google.com/apikey)
-
-2. **Create a `.env` file** in the project root:
-
-   **macOS/Linux (bash/zsh):**
+1. **Get API key** from [Google AI Studio](https://aistudio.google.com/apikey)
+2. **Add to `.env`:**
    ```bash
-   echo "GEMINI_API_KEY=your-api-key-here" > .env
+   echo "GEMINI_API_KEY=your-key-here" > .env
    ```
-
-   **Windows (PowerShell):**
-   ```powershell
-   echo "GEMINI_API_KEY=your-api-key-here" | Out-File -FilePath .env -Encoding utf8
-   ```
-
-   Or simply create a `.env` file manually with any text editor.
-
-3. **Run the agent:**
+3. **Run with cost-effective profile:**
    ```bash
-   uv run python src/main.py "Summarize the key points of quantum computing" --provider gemini
+   uv run python src/main.py "Summarize quantum computing" --config configs/cost-effective.yaml
    ```
 
-   **Available Gemini models:**
-   - `gemini-2.0-flash` (default, fast)
-   - `gemini-2.5-pro` (more capable)
-   - `gemini-3.0-pro` (latest, most capable)
+#### Example: Paper-Validated Setup (OpenAI)
 
-### Option 3: OpenAI (Cloud) — *Paper-Validated*
+> **📄 From the Research:** The RLM paper used **GPT-5** for the root agent and **GPT-5-mini** for recursive sub-calls, achieving 91.33% on BrowseComp+ (1K documents).
 
-> **📄 From the Research:** The RLM paper evaluated **GPT-5** with medium reasoning as the frontier closed model. The authors found that RLM(GPT-5) achieved **91.33%** on BrowseComp+ (1K documents) and **58.00%** F1 on OOLONG-Pairs, dramatically outperforming base models. For recursive sub-calls, **GPT-5-mini** was used to balance capability and cost.
-
-1. **Get an API key** from [OpenAI Platform](https://platform.openai.com/api-keys)
-
-2. **Add to your `.env` file:**
-
-   **macOS/Linux (bash/zsh):**
+1. **Get API key** from [OpenAI Platform](https://platform.openai.com/api-keys)
+2. **Add to `.env`:**
    ```bash
-   echo "OPENAI_API_KEY=your-api-key-here" >> .env
+   echo "OPENAI_API_KEY=your-key-here" >> .env
    ```
-
-   **Windows (PowerShell):**
-   ```powershell
-   echo "OPENAI_API_KEY=your-api-key-here" | Out-File -FilePath .env -Append -Encoding utf8
-   ```
-
-3. **Run the agent:**
+3. **Run with paper profile:**
    ```bash
-   uv run python src/main.py "Write a Python function to merge two sorted lists" --provider openai
+   uv run python src/main.py "Write a function to merge sorted lists" --config configs/paper-gpt5.yaml
    ```
 
-   **Available OpenAI models:**
-   - `gpt-4o-mini` (default, cost-effective) — *analogous to GPT-5-mini used for sub-calls*
-   - `gpt-4o` (most capable) — *closest available to GPT-5 used in the paper*
-   - `o1-mini` / `o1` (reasoning models) — *for complex multi-step tasks*
+---
 
-### Option 4: Qwen via OpenAI-Compatible API — *Paper-Validated*
+## Understanding Configuration Profiles
 
-> **📄 From the Research:** The RLM paper also evaluated **Qwen3-Coder-480B-A35B** as the frontier open model. This 480B parameter model (35B active) achieved **56.00%** on CodeQA and **44.66%** on BrowseComp+. The authors noted that Qwen3-Coder tends to use more aggressive sub-calling patterns, making thousands of recursive calls for complex tasks.
+### Profile Structure
 
-For local Qwen models, use Ollama (Option 1) with `qwen2.5-coder`. For cloud access to larger Qwen models:
+Each YAML profile defines:
 
-1. **Use a provider like [Fireworks AI](https://fireworks.ai/)** or [Together AI](https://together.ai/) that offers Qwen models via OpenAI-compatible APIs.
+```yaml
+profile_name: "Cost-Effective Profile"
+description: "Optimized for low cost using Gemini 2.5 Flash"
 
-2. **Configure the endpoint:**
+# Root agent configuration
+root:
+  provider: gemini
+  model: gemini-2.5-flash
+  max_steps: 10
+  max_depth: 3
+  pricing:
+    input_per_1m: 0.30   # $0.30 per 1M input tokens
+    output_per_1m: 2.50  # $2.50 per 1M output tokens
 
-   **macOS/Linux (bash/zsh):**
+# Sub-agent (delegate) configuration
+delegate:
+  provider: gemini
+  model: gemini-2.5-flash-lite
+  max_steps: 5
+  max_depth: 0
+  pricing:
+    input_per_1m: 0.10
+    output_per_1m: 0.40
+
+# Global budget limit (sum of all model costs)
+budget:
+  max_usd: 0.50
+```
+
+### Key Concepts
+
+**Root vs. Delegate:**
+- **Root**: The main agent that receives your task
+- **Delegate**: Sub-agents spawned for parallel task decomposition
+- Using a cheaper/faster model for delegates reduces costs
+
+**Per-Model Pricing:**
+- Each model tracks its own token usage and costs
+- The `budget.max_usd` limit applies to the **sum** of all model costs
+- Cost breakdown is printed at the end of each run
+
+**Max Steps & Depth:**
+- `max_steps`: Prevents infinite CODE → EXECUTE loops
+- `max_depth`: Limits delegation recursion (prevents exponential sub-agent spawning)
+
+### Creating Custom Profiles
+
+1. **Copy an existing profile:**
    ```bash
-   echo "OPENAI_API_KEY=your-fireworks-key" >> .env
-   echo "OPENAI_BASE_URL=https://api.fireworks.ai/inference/v1" >> .env
+   cp configs/cost-effective.yaml configs/my-profile.yaml
    ```
 
-   **Windows (PowerShell):**
-   ```powershell
-   echo "OPENAI_API_KEY=your-fireworks-key" | Out-File -FilePath .env -Append -Encoding utf8
-   echo "OPENAI_BASE_URL=https://api.fireworks.ai/inference/v1" | Out-File -FilePath .env -Append -Encoding utf8
-   ```
+2. **Edit the YAML file** to customize:
+   - Models (see available models below)
+   - Budget limits
+   - Max steps/depth
+   - Per-module overrides (optional)
 
-3. **Run with the Qwen model:**
+3. **Run with your profile:**
    ```bash
-   uv run python src/main.py "Analyze this codebase" --provider openai --model accounts/fireworks/models/qwen3-coder-480b
+   uv run python src/main.py "your task" --config configs/my-profile.yaml
    ```
+
+### Available Models (January 2026)
+
+**OpenAI:**
+- `gpt-5.2` - Flagship model ($1.75/$14.00 per 1M tokens)
+- `gpt-5` - Paper root model ($1.25/$10.00)
+- `gpt-5-mini` - Paper delegate model ($0.25/$2.00)
+- `gpt-5-nano` - Ultra cost-effective ($0.05/$0.40)
+
+**Google Gemini:**
+- `gemini-3-pro` - Preview, most capable ($2.00/$12.00)
+- `gemini-3-flash` - Preview, fast + intelligent ($0.50/$3.00)
+- `gemini-2.5-flash` - Stable, best value ($0.30/$2.50)
+- `gemini-2.5-flash-lite` - Ultra low cost ($0.10/$0.40)
+
+**Ollama (Local, Free):**
+- `qwen2.5-coder:14b` - Best for coding
+- `qwen2.5-coder:7b` - Faster, lower memory
+- `llama3:8b` - General purpose
 
 ---
 
 ## Advanced Configuration
 
-### Environment Variables (`.env` file)
+### Per-Module Model Overrides
 
-The agent supports extensive configuration through a `.env` file. Copy `.env.example` to `.env` and customize:
+You can specify different models for each DSPy module:
 
-```bash
-cp .env.example .env
+```yaml
+# In your custom profile
+modules:
+  architect:
+    provider: gemini
+    model: gemini-3-flash
+    pricing:
+      input_per_1m: 0.50
+      output_per_1m: 3.00
+
+  coder:
+    provider: ollama
+    model: qwen2.5-coder:7b
+    pricing:
+      input_per_1m: 0.0  # Local = free
+      output_per_1m: 0.0
 ```
 
-#### Budget Control
-
-Prevent runaway API costs by setting spending limits:
-
-```bash
-# Maximum budget per task in USD (default: $1.00)
-MAX_BUDGET_USD=1.00
-
-# Pricing per 1M tokens (adjust for your provider)
-INPUT_PRICE_PER_1M=0.075   # Gemini 2.0 Flash default
-OUTPUT_PRICE_PER_1M=0.30   # Gemini 2.0 Flash default
-```
-
-**How it works:** The `BudgetManager` tracks token usage and raises `BudgetExceededError` when the limit is reached, preventing further API calls.
-
-#### Agent Behavior
-
-Control how the agent explores solutions:
-
-```bash
-# Maximum steps per agent execution (default: 10)
-# Prevents infinite loops in CODE → EXECUTE → DECIDE cycles
-MAX_AGENT_STEPS=10
-
-# Maximum recursion depth for task delegation (default: 3)
-# Controls how deep sub-task delegation can go
-MAX_RECURSION_DEPTH=3
-```
-
-**CLI Overrides:** You can override these per-run:
-```bash
-uv run python src/main.py "complex task" --max-steps 20 --max-depth 5
-```
-
-#### DSPy Retry Configuration
-
-When code generation fails validation (e.g., syntax errors), DSPy automatically retries:
-
-```bash
-# Maximum retries for DSPy assertions (default: 3)
-MAX_DSPY_RETRIES=3
-```
-
-**How it works:** DSPy's `ChainOfThought` modules use assertions to validate outputs. If validation fails (e.g., `ast.parse()` raises `SyntaxError`), DSPy re-prompts the LLM with the error message up to `MAX_DSPY_RETRIES` times.
+This is useful for:
+- Using local models for code generation (fast, free)
+- Using cloud models for decision-making (better reasoning)
+- See `configs/hybrid.yaml` for a working example
 
 ### Handling Large Files
 
@@ -266,7 +294,7 @@ print(final_summary)
 
 #### 3. **Context Window Management**
 The agent's `format_context()` method maintains execution history. For very long histories:
-- Consider increasing `MAX_AGENT_STEPS` to give the agent more opportunities
+- Consider increasing `max_steps` in your YAML config to give the agent more opportunities
 - Or use the `DELEGATE` action to offload work to sub-agents with fresh context
 
 #### 4. **No Separate Search Tool Needed**
@@ -277,7 +305,7 @@ The agent can already:
 
 **Example Task:** "Find all TODO comments in this codebase"
 ```bash
-uv run python src/main.py "Find all TODO comments" --context /path/to/code
+uv run python src/main.py "Find all TODO comments" --config configs/local-only.yaml --context /path/to/code
 ```
 
 The agent will generate code like:
@@ -305,41 +333,31 @@ for todo in todos:
 ### Basic Syntax
 
 ```bash
-uv run python src/main.py "<your task>" --provider <provider> [--model <model>] [--context <path>]
+uv run python src/main.py "<your task>" --config <profile.yaml> [--context <path>]
 ```
 
 ### Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `task` | The natural language task to perform | Required |
-| `--provider` | LLM provider: `ollama`, `gemini`, `openai` | `ollama` |
-| `--model` | Specific model name (optional) | Provider default |
-| `--context` | Path to a directory with files to include | None |
-| `--max-steps` | Maximum agent execution steps (overrides `.env`) | 10 |
-| `--max-depth` | Maximum recursion depth (overrides `.env`) | 3 |
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `task` | The natural language task to perform | Yes |
+| `--config` | Path to YAML configuration file | Yes |
+| `--context` | Path to a directory with files to include | No |
 
 ### Examples
 
 ```bash
-# Simple math with local Ollama
-uv run python src/main.py "What is 2^100?" --provider ollama
+# Simple math with local model
+uv run python src/main.py "What is 2^100?" --config configs/local-only.yaml
 
 # Read and analyze a file
-uv run python src/main.py "What is the first line of README.md?" --context .
-
-# Use a specific model
-uv run python src/main.py "Explain recursion" --provider gemini --model gemini-2.5-pro
+uv run python src/main.py "What is the first line of README.md?" --config configs/cost-effective.yaml --context .
 
 # Complex task with file context
-uv run python src/main.py "Analyze the sales data and find the top 3 products" --context ./data --provider openai
-```
+uv run python src/main.py "Analyze the sales data and find the top 3 products" --config configs/high-quality.yaml --context ./data
 
----
-
-## Running Tests
-
-```bash
+# Paper-validated setup
+uv run python src/main.py "Implement a binary search tree" --config configs/paper-gpt5.yaml
 # Run all unit tests (fast, no LLM required)
 uv run pytest tests/test_agent.py::TestAgentUnitTests tests/test_budget.py tests/test_repl.py -v
 

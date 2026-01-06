@@ -1,8 +1,7 @@
 import pytest
 import dspy
 from src.core.agent import RLMAgent
-from src.config import get_lm
-from conftest import MockArchitect, MockCoder, MockResponder, MockREPL
+from tests.conftest import MockArchitect, MockCoder, MockResponder, MockREPL
 
 
 # ============================================================================
@@ -126,7 +125,7 @@ class TestAgentUnitTests:
 @pytest.fixture(scope="module")
 def setup_dspy_ollama():
     try:
-        lm = get_lm("ollama")
+        lm = get_lm_for_testing("ollama")
         dspy.settings.configure(lm=lm)
         return lm
     except Exception as e:

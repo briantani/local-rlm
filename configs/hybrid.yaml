@@ -1,0 +1,78 @@
+# Hybrid Profile (Best of Both Worlds)
+# Strategic mix: Local for code generation, cloud for reasoning
+# Balances cost, speed, and quality
+
+profile_name: "Hybrid (Local + Cloud)"
+description: |
+  Intelligent hybrid approach using Ollama for fast local code generation
+  and Gemini 3 Flash for complex reasoning tasks. Optimal balance of cost,
+  speed, and quality. Best for production use.
+
+# Root agent configuration
+root:
+  provider: gemini
+  model: gemini-3-flash-preview  # Latest fast + intelligent model
+  max_steps: 12
+  max_depth: 3
+  pricing:
+    input_per_1m: 0.50   # Gemini 3 Flash
+    output_per_1m: 3.00
+
+# Delegate agent configuration
+delegate:
+  provider: gemini
+  model: gemini-2.5-flash  # Cheaper stable model for sub-tasks
+  max_steps: 6
+  max_depth: 1
+  pricing:
+    input_per_1m: 0.30  # Gemini 2.5 Flash
+    output_per_1m: 2.50
+
+# Strategic per-module allocation
+modules:
+  # Architect makes decisions - use smart cloud model
+  architect:
+    provider: gemini
+    model: gemini-3-flash-preview
+    pricing:
+      input_per_1m: 0.50
+      output_per_1m: 3.00
+
+  # Coder generates code - use LOCAL for speed and cost
+  coder:
+    provider: ollama
+    model: qwen2.5-coder:14b  # Local code generation is fast!
+    pricing:
+      input_per_1m: 0.0   # Local = free
+      output_per_1m: 0.0
+
+  # Responder writes answers - cloud for quality
+  responder:
+    provider: gemini
+    model: gemini-3-flash-preview
+    pricing:
+      input_per_1m: 0.50
+      output_per_1m: 3.00
+
+  # Delegator breaks down tasks - cheaper stable model
+  delegator:
+    provider: gemini
+    model: gemini-2.5-flash
+    pricing:
+      input_per_1m: 0.30
+      output_per_1m: 2.50
+
+# Global budget limit (tracks all models with their individual pricing)
+budget:
+  max_usd: 2.0
+  # Per-model pricing is defined in each section above
+
+# DSPy configuration
+dspy:
+  max_retries: 4
+  cache_enabled: true
+
+# Logging
+logging:
+  level: INFO
+  file: logs/hybrid-run.log

@@ -1,0 +1,47 @@
+# Cost-Effective Profile
+# Optimized for low API costs while maintaining excellent quality
+# Uses Google Gemini 2.5 Flash - best price-performance ratio
+
+profile_name: "Cost-Effective"
+description: |
+  Budget-friendly profile using Gemini 2.5 Flash throughout.
+  Best price-performance with thinking/reasoning capabilities.
+  Suitable for development, testing, and most production tasks.
+
+# Root agent configuration
+root:
+  provider: gemini
+  model: gemini-2.5-flash  # Best price-performance (Jan 2026)
+  max_steps: 10
+  max_depth: 3
+  pricing:
+    input_per_1m: 0.30   # $0.30 per 1M input tokens
+    output_per_1m: 2.50  # $2.50 per 1M output tokens (includes thinking)
+
+# Delegate agent configuration
+delegate:
+  provider: gemini
+  model: gemini-2.5-flash-lite  # Even cheaper for sub-tasks
+  max_steps: 5
+  max_depth: 1  # Shallow recursion to save tokens
+  pricing:
+    input_per_1m: 0.10   # Ultra cheap
+    output_per_1m: 0.40
+
+# No per-module overrides - all use root pricing
+# modules: {}
+
+# Global budget limit (sum of all model costs)
+budget:
+  max_usd: 0.50  # Tight budget
+  # All models use Gemini Flash pricing defined above
+
+# DSPy configuration
+dspy:
+  max_retries: 3
+  cache_enabled: true
+
+# Logging
+logging:
+  level: INFO
+  file: logs/cost-effective-run.log

@@ -1,0 +1,77 @@
+# Local-Only Profile
+# Runs entirely on local Ollama models - no API costs!
+# Requires Ollama running with qwen2.5-coder models installed
+
+profile_name: "Local-Only (Ollama)"
+description: |
+  100% local execution using Ollama models. No API costs, complete privacy.
+  Best for sensitive data or offline work. Requires good hardware (16GB+ RAM).
+
+# Root agent configuration
+root:
+  provider: ollama
+  model: qwen2.5-coder:14b  # Powerful local model
+  max_steps: 12
+  max_depth: 3
+  pricing:
+    input_per_1m: 0.0   # Local = free
+    output_per_1m: 0.0
+
+# Delegate agent configuration
+delegate:
+  provider: ollama
+  model: qwen2.5-coder:7b  # Lighter model for sub-tasks
+  max_steps: 6
+  max_depth: 1
+  pricing:
+    input_per_1m: 0.0   # Local = free
+    output_per_1m: 0.0
+
+# Per-module overrides for optimal local performance
+modules:
+  # Architect needs reasoning - use larger model
+  architect:
+    provider: ollama
+    model: qwen2.5-coder:14b
+    pricing:
+      input_per_1m: 0.0
+      output_per_1m: 0.0
+
+  # Coder - qwen2.5-coder is designed for this!
+  coder:
+    provider: ollama
+    model: qwen2.5-coder:14b
+    pricing:
+      input_per_1m: 0.0
+      output_per_1m: 0.0
+
+  # Responder can use smaller model
+  responder:
+    provider: ollama
+    model: qwen2.5-coder:7b
+    pricing:
+      input_per_1m: 0.0
+      output_per_1m: 0.0
+
+  # Delegator uses smaller model
+  delegator:
+    provider: ollama
+    model: qwen2.5-coder:7b
+    pricing:
+      input_per_1m: 0.0
+      output_per_1m: 0.0
+
+# Global budget limit (all models are free, so this is symbolic)
+budget:
+  max_usd: 999.0  # Effectively unlimited since local
+  # All local models have $0 pricing
+
+# DSPy configuration
+dspy:
+  max_retries: 3
+  cache_enabled: true
+
+# Logging
+logging:
+  level: DEBUG  # More verbose for local debugging
+  file: logs/local-run.log

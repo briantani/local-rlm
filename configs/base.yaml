@@ -1,0 +1,46 @@
+# Base Configuration Template
+# This serves as a foundation that other configs can extend
+# Defines sensible defaults for all settings
+
+profile_name: "Base Template"
+description: |
+  Base configuration with sensible defaults. Not meant to be used directly,
+  but can be extended by other profiles using 'extends: configs/base.yaml'.
+
+# Default root agent settings
+root:
+  provider: gemini
+  model: gemini-2.5-flash  # Best price-performance (Jan 2026)
+  max_steps: 10
+  max_depth: 3
+  pricing:
+    input_per_1m: 0.30   # Gemini 2.5 Flash
+    output_per_1m: 2.50
+
+# Default delegate settings
+delegate:
+  provider: gemini
+  model: gemini-2.5-flash-lite  # Ultra cost-effective
+  max_steps: 5
+  max_depth: 1
+  pricing:
+    input_per_1m: 0.10   # Gemini 2.5 Flash-Lite
+    output_per_1m: 0.40
+
+# No module overrides by default
+# modules: {}
+
+# Conservative budget (tracks all models with their individual pricing)
+budget:
+  max_usd: 1.0
+  # Per-model pricing is defined in root/delegate/modules sections
+
+# Standard DSPy settings
+dspy:
+  max_retries: 3
+  cache_enabled: true
+
+# Standard logging
+logging:
+  level: INFO
+  file: logs/rlm-agent.log

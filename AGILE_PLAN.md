@@ -367,3 +367,475 @@ Before implementing any refactoring:
 ---
 
 **✅ Phase 10 Complete!** All refactoring items have been implemented and verified.
+
+---
+
+## **⚙️ Phase 11: YAML Configuration Profiles (Paper-Inspired Multi-Model Setup)**
+
+**Goal:** Implement a flexible YAML-based configuration system that allows different models for different modules (root vs. sub-agents), inspired by the paper's use of GPT-5 for root and GPT-5-mini for recursive calls. Enable users to create reusable configuration profiles for different task types (cost-effective, high-quality, etc.).
+
+### **📚 Research Context**
+
+From the RLM paper (arXiv:2512.24601v1):
+> "For the GPT-5 experiments, we use GPT-5-mini for the recursive LMs and GPT-5 for the root LM, as we found this choice to strike a powerful tradeoff between the capabilities of RLMs and the cost of the recursive calls."
+
+This demonstrates the value of:
+- **Asymmetric model allocation**: Use cheaper/faster models for sub-calls
+- **Role-based model selection**: Different models for Architect, Coder, Delegator
+- **Profile-based configuration**: Different setups for different task types
+
+### **📋 Implementation Steps**
+
+#### **11.1: YAML Configuration Schema Design**
+
+Create `src/core/config_loader.py` with a schema for:
+
+```yaml
+# Example: configs/cost-effective.yaml
+profile_name: "Cost-Effective Profile"
+description: "Optimized for low cost, suitable for simple tasks"
+
+# Root agent configuration (with per-model pricing)
+root:
+  provider: gemini
+  model: gemini-2.0-flash
+  max_steps: 10
+  max_depth: 3
+  pricing:
+    input_per_1m: 0.075   # $0.075 per 1M input tokens
+    output_per_1m: 0.30   # $0.30 per 1M output tokens
+
+# Sub-agent configuration (with its own pricing)
+delegate:
+  provider: gemini
+  model: gemini-2.0-flash
+  max_steps: 5
+  max_depth: 0
+  pricing:
+    input_per_1m: 0.075
+    output_per_1m: 0.30
+
+# Per-module model overrides (optional, each with pricing)
+modules:
+  architect:
+    provider: gemini
+    model: gemini-2.0-flash
+    pricing:
+      input_per_1m: 0.075
+      output_per_1m: 0.30
+  coder:
+    provider: ollama
+    model: qwen2.5-coder:7b
+    pricing:
+      input_per_1m: 0.0   # Local model = free
+      output_per_1m: 0.0
+
+# Global budget limit (sum of all model costs)
+budget:
+  max_usd: 1.0  # Total spending limit across ALL models
+
+# DSPy configuration
+dspy:
+  max_retries: 3
+  cache_enabled: true
+```
+
+**Key Features:**
+- **Per-Model Pricing**: Each model config has its own `pricing` block
+- **Global Budget Limit**: Single `max_usd` applies to sum of all model costs
+- **Hierarchical**: root vs. delegate configuration
+- **Per-Module Overrides**: Different models for Architect, Coder, etc.
+- **Profile Inheritance**: Support `extends: base-config.yaml`
+- **Environment Variable Substitution**: `${GEMINI_API_KEY}`
+
+#### **11.2: Enhanced BudgetManager for Multi-Model Tracking**
+
+**Current Limitation:** Single `input_price_per_1m` / `output_price_per_1m` for all models.
+
+**New Design:**
+
+```python
+@singleton
+class BudgetManager:
+    def __init__(self, max_budget: float = 1.0):
+        self.max_budget = max_budget
+        self.current_cost = 0.0
+        self._lock = threading.Lock()
+
+        # Per-model tracking
+        self.model_usage: dict[str, ModelUsage] = {}
+
+    def register_model(self, model_id: str, input_price: float, output_price: float):
+        """Register a model with its pricing info."""
+        with self._lock:
+            self.model_usage[model_id] = ModelUsage(
+                input_price_per_1m=input_price,
+                output_price_per_1m=output_price,
+                total_input_tokens=0,
+                total_output_tokens=0,
+                total_cost=0.0
+            )
+
+    def add_usage(self, model_id: str, input_tokens: int, output_tokens: int):
+        """Track usage for a specific model with its pricing."""
+        with self._lock:
+            usage = self.model_usage.get(model_id)
+            if usage is None:
+                raise ValueError(f"Model {model_id} not registered. Call register_model first.")
+
+            input_cost = (input_tokens / 1_000_000) * usage.input_price_per_1m
+            output_cost = (output_tokens / 1_000_000) * usage.output_price_per_1m
+            cost = input_cost + output_cost
+
+            usage.total_input_tokens += input_tokens
+            usage.total_output_tokens += output_tokens
+            usage.total_cost += cost
+            self.current_cost += cost
+
+    def get_breakdown(self) -> dict[str, float]:
+        """Get cost breakdown by model."""
+        with self._lock:
+            return {model_id: u.total_cost for model_id, u in self.model_usage.items()}
+
+
+@dataclass
+class ModelUsage:
+    input_price_per_1m: float
+    output_price_per_1m: float
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_cost: float = 0.0
+```
+
+**Benefits:**
+- Accurate cost tracking per model
+- Single global budget limit still enforced
+- Detailed breakdown for cost analysis
+- Thread-safe for concurrent model calls
+
+#### **11.3: Configuration Loader Implementation**
+
+**File:** `src/core/config_loader.py`
+
+**Classes:**
+- `ModelConfig`: Provider, model name, pricing info
+- `AgentConfig`: max_steps, max_depth
+- `ProfileConfig`: Root, delegate, modules, global budget
+- `ConfigLoader`: Loads YAML, validates, resolves inheritance
+
+**Functions:**
+- `load_profile(path: Path) -> ProfileConfig`
+- `merge_with_env(config: ProfileConfig) -> ProfileConfig`  # Override with .env
+- `validate_config(config: ProfileConfig) -> bool`
+- `register_models_with_budget(config: ProfileConfig, budget_manager: BudgetManager)`
+
+**Error Handling:**
+- Missing required fields → helpful error messages
+- Invalid model names → suggest alternatives
+- Missing API keys → point to .env setup
+- Missing pricing info → use provider defaults with warning
+
+#### **11.4: Update `config.py` for Multi-Model Support**
+
+**Current:** `get_lm(provider, model_name)` returns a single LM.
+
+**New:** `get_lm_for_role(role: str, config: ProfileConfig) -> dspy.LM`
+
+**Roles:**
+- `"root"`: Main agent LM
+- `"delegate"`: Sub-agent LM
+- `"architect"`: Architect module LM
+- `"coder"`: Coder module LM
+- `"responder"`: Responder module LM
+- `"delegator"`: Delegator module LM
+
+**Logic:**
+1. Check if `config.modules.{role}` exists → use that
+2. Else if role is delegate → use `config.delegate`
+3. Else → use `config.root`
+4. Register model with `BudgetManager` using its pricing info
+
+#### **11.5: Modify `RLMAgent` to Accept Profile**
+
+**Current Constructor:**
+```python
+def __init__(self, max_steps=10, max_depth=3, ...)
+```
+
+**New Constructor:**
+```python
+def __init__(
+    self,
+    max_steps=10,
+    max_depth=3,
+    config: ProfileConfig | None = None,
+    is_delegate: bool = False,  # Identifies sub-agents
+    ...
+)
+```
+
+**Behavior:**
+- If `config` is provided, use it to configure modules
+- If `is_delegate=True`, use `config.delegate` settings
+- Create sub-agents with `is_delegate=True`
+
+#### **11.5: Update DSPy Module Initialization**
+
+**Current:** All modules use `dspy.settings.configure(lm=lm)` globally.
+
+**New:** Each module gets its own LM instance:
+
+```python
+# In Architect.__init__
+self.lm = get_lm_for_role("architect", config)
+with dspy.context(lm=self.lm):
+    self.decide = dspy.ChainOfThought(ArchitectSignature)
+```
+
+**Challenge:** DSPy 3.x uses global settings. Need to either:
+- Use `dspy.context()` context manager per module
+- OR create separate DSPy programs per module
+
+#### **11.6: CLI Integration**
+
+**Update `main.py`:**
+
+```python
+parser.add_argument(
+    "--config",
+    type=Path,
+    help="Path to YAML configuration file (e.g., configs/high-quality.yaml)"
+)
+```
+
+**Behavior:**
+1. If `--config` provided, load profile
+2. CLI args override profile (e.g., `--max-steps 20`)
+3. `.env` provides API keys (not in YAML for security)
+
+**Backward Compatibility:**
+- If no `--config`, use current .env + CLI args behavior
+
+#### **11.7: Create Example Configuration Profiles**
+
+Create `configs/` directory with:
+
+**`configs/cost-effective.yaml`**
+- Gemini Flash for everything
+- Low max_steps, shallow depth
+- $0.50 budget
+
+**`configs/high-quality.yaml`** (Paper-inspired)
+- GPT-4o for root
+- GPT-4o-mini for delegates
+- Higher budget, more steps
+
+**`configs/local-only.yaml`**
+- Ollama qwen2.5-coder for all roles
+- No budget limits (local is free)
+
+**`configs/hybrid.yaml`** (Best of both worlds)
+- Ollama for Coder (fast local code generation)
+- Gemini for Architect/Responder (better reasoning)
+- GPT-4o-mini for Delegator
+
+### **✅ Verification (Tests)**
+
+**Test 11.1: Configuration Loading**
+```python
+def test_load_valid_profile():
+    config = load_profile("configs/cost-effective.yaml")
+    assert config.root.provider == "gemini"
+    assert config.budget.max_usd == 0.50
+    assert config.root.pricing.input_per_1m == 0.075
+```
+
+**Test 11.2: Profile Inheritance**
+```python
+def test_profile_extends():
+    # configs/derived.yaml extends configs/base.yaml
+    config = load_profile("configs/derived.yaml")
+    assert config.root.provider == "gemini"  # From base
+    assert config.budget.max_usd == 2.0      # Overridden
+```
+
+**Test 11.3: Multi-Model Budget Tracking**
+```python
+def test_per_model_budget_tracking():
+    budget = BudgetManager(max_budget=10.0)
+    BudgetManager._clear()  # Reset singleton
+    budget = BudgetManager(max_budget=10.0)
+
+    # Register two models with different pricing
+    budget.register_model("gpt-4o", input_price=2.50, output_price=10.00)
+    budget.register_model("gpt-4o-mini", input_price=0.15, output_price=0.60)
+
+    # Add usage for each model
+    budget.add_usage("gpt-4o", input_tokens=100_000, output_tokens=10_000)
+    budget.add_usage("gpt-4o-mini", input_tokens=500_000, output_tokens=50_000)
+
+    # GPT-4o: (100K/1M * 2.50) + (10K/1M * 10.00) = 0.25 + 0.10 = 0.35
+    # GPT-4o-mini: (500K/1M * 0.15) + (50K/1M * 0.60) = 0.075 + 0.03 = 0.105
+    # Total: 0.455
+
+    breakdown = budget.get_breakdown()
+    assert abs(breakdown["gpt-4o"] - 0.35) < 0.001
+    assert abs(breakdown["gpt-4o-mini"] - 0.105) < 0.001
+    assert abs(budget.current_cost - 0.455) < 0.001
+```
+
+**Test 11.4: Budget Limit Across Models**
+```python
+def test_budget_limit_sums_all_models():
+    BudgetManager._clear()
+    budget = BudgetManager(max_budget=0.50)
+
+    budget.register_model("expensive", input_price=10.0, output_price=40.0)
+    budget.register_model("cheap", input_price=0.1, output_price=0.4)
+
+    # Add usage that exceeds budget when combined
+    budget.add_usage("expensive", input_tokens=40_000, output_tokens=5_000)  # $0.60
+
+    with pytest.raises(BudgetExceededError):
+        budget.check_budget()
+```
+
+**Test 11.5: Multi-Model Agent**
+```python
+def test_agent_uses_different_models():
+    config = load_profile("configs/hybrid.yaml")
+    agent = RLMAgent(config=config)
+
+    # Verify Architect uses Gemini
+    assert agent.architect.lm.model.startswith("gemini/")
+
+    # Verify Coder uses Ollama
+    assert agent.coder.lm.model.startswith("ollama/")
+```
+
+**Test 11.6: Delegate Model Separation**
+```python
+def test_delegate_uses_cheaper_model():
+    config = load_profile("configs/high-quality.yaml")
+    root_agent = RLMAgent(config=config, is_delegate=False)
+    sub_agent = RLMAgent(config=config, is_delegate=True)
+
+    # Root uses GPT-4o
+    assert "gpt-4o" in root_agent.architect.lm.model
+
+    # Delegate uses GPT-4o-mini
+    assert "gpt-4o-mini" in sub_agent.architect.lm.model
+```
+
+**Test 11.7: CLI Override**
+```python
+def test_cli_overrides_config(capsys):
+    # Run with config but override max_steps
+    result = run_cli([
+        "test task",
+        "--config", "configs/cost-effective.yaml",
+        "--max-steps", "20"
+    ])
+    # Agent should use 20 steps, not 10 from config
+```
+
+### **🛑 Definition of Done**
+
+- [x] YAML schema defined with per-model pricing
+- [x] `BudgetManager` enhanced for multi-model tracking
+- [x] `ConfigLoader` class implemented with tests
+- [x] `get_lm_for_role()` supports per-module models with pricing
+- [x] `RLMAgent` accepts and uses `ProfileConfig`
+- [x] At least 4 example profiles created with pricing
+- [x] CLI `--config` flag working
+
+---
+
+**✅ Phase 11 Complete!** YAML configuration profiles with per-model pricing have been implemented and verified.
+- [ ] All tests passing (unit + integration)
+- [ ] Documentation updated in README.md
+- [ ] Backward compatibility maintained (old .env method still works)
+
+### **📊 Benefits**
+
+| Benefit | Description |
+|---------|-------------|
+| **Accurate Cost Tracking** | Each model tracked with its own pricing, summed to global budget |
+| **Cost Optimization** | Use expensive models only where needed (root), cheap for sub-calls |
+| **Cost Transparency** | `get_breakdown()` shows exactly which model cost what |
+| **Task-Specific Tuning** | Different profiles for research, coding, data analysis |
+| **Reproducibility** | Share YAML configs for exact replication of results |
+| **Experimentation** | Easily A/B test different model combinations |
+| **Paper Alignment** | Implements the paper's GPT-5 + GPT-5-mini strategy |
+
+### **⏱️ Estimated Effort**
+
+| Task | Effort | Priority | Dependencies |
+|------|--------|----------|--------------|
+| 11.1 Schema Design (with pricing) | 1h | High | None |
+| 11.2 Enhanced BudgetManager | 2h | High | 11.1 |
+| 11.3 ConfigLoader | 3h | High | 11.1, 11.2 |
+| 11.4 Multi-Model config.py | 2h | High | 11.2, 11.3 |
+| 11.5 Agent Profile Support | 2h | High | 11.4 |
+| 11.6 DSPy Module LM Scoping | 4h | Medium | 11.5 |
+| 11.7 CLI Integration | 1h | Medium | 11.5 |
+| 11.8 Example Profiles | 2h | Low | All above |
+| Testing & Docs | 3h | High | All above |
+
+**Total Estimated Time:** ~20 hours
+
+### **🚧 Implementation Notes**
+
+1. **DSPy Context Management**: DSPy 3.x may require `dspy.context()` for per-module LMs. Test this thoroughly.
+2. **API Key Security**: YAML files should NEVER contain API keys. Use `${ENV_VAR}` syntax.
+3. **Validation**: Fail fast with helpful errors if config is invalid.
+4. **Caching**: Consider caching loaded profiles to avoid repeated YAML parsing.
+5. **Per-Model Budget Tracking**:
+   - Each model registered with its own pricing info
+   - `add_usage(model_id, input_tokens, output_tokens)` calculates cost per-model
+   - Global `current_cost` sums all model costs
+   - `check_budget()` enforces single global limit
+   - `get_breakdown()` returns per-model cost analysis
+
+**Per-Model Pricing Example:**
+```yaml
+# paper-gpt5.yaml - each model has its own pricing:
+root:
+  model: gpt-4o
+  pricing:
+    input_per_1m: 2.50   # $2.50 per 1M input tokens
+    output_per_1m: 10.00
+
+delegate:
+  model: gpt-4o-mini
+  pricing:
+    input_per_1m: 0.15   # Much cheaper!
+    output_per_1m: 0.60
+
+budget:
+  max_usd: 5.0  # Global limit applies to SUM of all model costs
+```
+
+**Cost Calculation Flow:**
+```
+1. Agent uses GPT-4o (Architect): 100K in, 10K out
+   → Cost: (100K/1M × $2.50) + (10K/1M × $10.00) = $0.35
+
+2. Delegate uses GPT-4o-mini (Coder): 200K in, 50K out
+   → Cost: (200K/1M × $0.15) + (50K/1M × $0.60) = $0.06
+
+3. Total: $0.35 + $0.06 = $0.41
+
+4. Budget check: $0.41 < $5.00 ✅
+```
+
+### **📈 Success Metrics**
+
+- [ ] Can run: `uv run python src/main.py "task" --config configs/high-quality.yaml`
+- [ ] Root agent uses different model than sub-agents
+- [ ] Budget tracking works across all models
+- [ ] Configuration reduces from 5+ CLI args to 1 (the YAML path)
+
+---
+
+**🎯 Phase 11 Status: PROPOSED - AWAITING APPROVAL**

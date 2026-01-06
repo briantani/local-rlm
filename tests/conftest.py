@@ -1,6 +1,9 @@
 import os
 import pytest
+from pathlib import Path
 from src.core.budget import BudgetManager
+from src.core.config_loader import load_profile
+from src.config import get_lm_for_role
 
 # Set testing environment variable to prevent log file creation
 os.environ["RLM_TESTING"] = "1"
@@ -18,6 +21,35 @@ def reset_budget():
     budget.max_budget = 1.0  # Reset to default limit
     yield
     # Optional: Reset after test too
+
+
+def get_lm_for_testing(provider: str = "ollama", model: str | None = None):
+    """
+    Helper function for tests to get an LM using the new config-based approach.
+    Creates a minimal ProfileConfig for testing purposes.
+
+    Args:
+        provider: Provider name (ollama, gemini, openai)
+        model: Optional model name
+
+    Returns:
+        A dspy.LM instance wrapped with BudgetWrapper
+    """
+    # Use existing test configs or create a minimal one
+    if provider == "ollama":
+        config_path = Path(__file__).parent.parent / "configs" / "local-only.yaml"
+    elif provider == "gemini":
+        config_path = Path(__file__).parent.parent / "configs" / "cost-effective.yaml"
+    else:
+        config_path = Path(__file__).parent.parent / "configs" / "base.yaml"
+
+    try:
+        config = load_profile(config_path)
+        BudgetManager._clear()
+        budget_manager = BudgetManager(max_budget=10.0)  # High budget for tests
+        return get_lm_for_role("root", config, budget_manager=budget_manager)
+    except Exception as e:
+        pytest.skip(f"Could not load test config: {e}")
     budget.reset()
     budget.max_budget = 1.0
 

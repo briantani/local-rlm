@@ -1,7 +1,7 @@
 import pytest
 import dspy
 import os
-from src.config import get_lm
+from tests.conftest import get_lm_for_testing
 from src.core.budget import BudgetWrapper
 
 def test_get_lm_gemini():
@@ -10,7 +10,7 @@ def test_get_lm_gemini():
     # But the plan says "verify we can talk to...". So we should probably try a real call if the key is present.
     # For now, let's just check instantiation.
     try:
-        lm = get_lm("gemini")
+        lm = get_lm_for_testing("gemini")
         # It should be wrapped now
         assert isinstance(lm, BudgetWrapper)
         # And the underlying LM should be dspy.LM
@@ -20,7 +20,7 @@ def test_get_lm_gemini():
 
 def test_get_lm_ollama():
     """Test that we can initialize the Ollama provider."""
-    lm = get_lm("ollama")
+    lm = get_lm_for_testing("ollama")
     assert isinstance(lm, BudgetWrapper)
     assert isinstance(lm.lm, dspy.LM)
 
@@ -29,7 +29,7 @@ def test_get_lm_ollama():
 async def test_connectivity_ollama():
     """Test actual connectivity to Ollama."""
     try:
-        lm = get_lm("ollama")
+        lm = get_lm_for_testing("ollama")
         dspy.settings.configure(lm=lm)
         # Simple generation
         response = lm("Say 'Hello World'")
@@ -45,7 +45,7 @@ async def test_connectivity_ollama():
 def test_connectivity_gemini():
     """Test actual connectivity to Gemini."""
     try:
-        lm = get_lm("gemini")
+        lm = get_lm_for_testing("gemini")
         dspy.settings.configure(lm=lm)
         response = lm("Say 'Hello World'")
         assert response is not None

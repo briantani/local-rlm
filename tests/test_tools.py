@@ -4,7 +4,7 @@ from src.core.agent import RLMAgent
 from src.tools.search import search_web
 from src.core.budget import BudgetManager
 import dspy
-from src.config import get_lm
+from tests.conftest import get_lm_for_testing
 
 # Mocking file creation for Excel
 def create_mock_excel(path: Path):
@@ -23,7 +23,7 @@ def setup_dspy_ollama():
     """
     BudgetManager().reset()
     try:
-        lm = get_lm("ollama")
+        lm = get_lm_for_testing("ollama")
         dspy.settings.configure(lm=lm)
     except Exception as e:
         pytest.skip(f"Skipping Agent tests because LM could not be loaded: {e}")

@@ -3,14 +3,14 @@ import dspy
 import ast
 from src.modules.coder import Coder
 from src.modules.architect import Architect
-from src.config import get_lm
+from tests.conftest import get_lm_for_testing
 
 # Setup the LM for testing
 # We use Ollama for these tests as verified in Phase 0/1
 @pytest.fixture(scope="module")
 def setup_dspy():
     try:
-        lm = get_lm("ollama")
+        lm = get_lm_for_testing("ollama")
         dspy.settings.configure(lm=lm)
         return lm
     except Exception as e:

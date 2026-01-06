@@ -1,0 +1,78 @@
+# High-Quality Profile (Maximum Capability)
+# Uses GPT-5.2 (the best model for coding and agentic tasks)
+# with GPT-5-mini for cost-effective recursive calls
+
+profile_name: "High-Quality (GPT-5.2)"
+description: |
+  Premium quality profile using GPT-5.2 (OpenAI's flagship model for coding
+  and agentic tasks) for root reasoning, with GPT-5-mini for recursive sub-calls.
+  Optimized for complex research and analysis where accuracy is paramount.
+
+# Root agent configuration (the main agent)
+root:
+  provider: openai
+  model: gpt-5.2  # The best model for coding and agentic tasks
+  max_steps: 15
+  max_depth: 4
+  pricing:
+    input_per_1m: 1.75    # $1.75 per 1M input tokens (Standard tier)
+    output_per_1m: 14.00  # $14.00 per 1M output tokens
+
+# Delegate agent configuration (recursive sub-agents)
+delegate:
+  provider: openai
+  model: gpt-5-mini  # Fast, cost-efficient version
+  max_steps: 8
+  max_depth: 2  # Prevent infinite recursion chains
+  pricing:
+    input_per_1m: 0.25   # 7x cheaper than root
+    output_per_1m: 2.00
+
+# Per-module model overrides (optional fine-tuning)
+modules:
+  # Architect makes the CODE/ANSWER/DELEGATE decision - needs good reasoning
+  architect:
+    provider: openai
+    model: gpt-5.2  # Use flagship model for critical decisions
+    pricing:
+      input_per_1m: 1.75
+      output_per_1m: 14.00
+
+  # Coder generates Python code - GPT-5.2 excels at coding
+  coder:
+    provider: openai
+    model: gpt-5-mini  # Code generation with cost efficiency
+    pricing:
+      input_per_1m: 0.25
+      output_per_1m: 2.00
+
+  # Responder generates final natural language answers
+  responder:
+    provider: openai
+    model: gpt-5.2  # Premium for final output quality
+    pricing:
+      input_per_1m: 1.75
+      output_per_1m: 14.00
+
+  # Delegator breaks tasks into subtasks
+  delegator:
+    provider: openai
+    model: gpt-5-mini  # Decomposition is straightforward
+    pricing:
+      input_per_1m: 0.25
+      output_per_1m: 2.00
+
+# Global budget limit (sum of all model costs)
+budget:
+  max_usd: 5.0  # Higher budget for quality tasks
+  # Per-model pricing is defined above; budget manager tracks each model separately
+
+# DSPy configuration
+dspy:
+  max_retries: 5  # More retries for quality
+  cache_enabled: true
+
+# Logging
+logging:
+  level: INFO
+  file: logs/high-quality-run.log

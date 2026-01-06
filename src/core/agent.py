@@ -4,6 +4,8 @@ from typing import Protocol, runtime_checkable
 
 from src.core.logger import logger
 from src.core.repl import PythonREPL
+from src.core.budget import BudgetManager
+from src.core.config_loader import ProfileConfig
 from src.modules.architect import Architect
 from src.modules.coder import Coder
 from src.modules.responder import Responder
@@ -37,6 +39,7 @@ class RLMAgent:
     Supports recursive delegation handling.
 
     Supports dependency injection for all components to enable testing.
+    Supports YAML-based configuration profiles via ProfileConfig.
     """
     def __init__(
         self,
@@ -44,6 +47,10 @@ class RLMAgent:
         max_depth: int = 3,
         depth: int = 0,
         root_dir: str | Path | None = None,
+        # Configuration profile (Phase 11)
+        config: ProfileConfig | None = None,
+        is_delegate: bool = False,
+        budget_manager: BudgetManager | None = None,
         # Dependency injection parameters
         repl: CodeExecutor | None = None,
         architect: TaskRouter | None = None,
@@ -51,8 +58,19 @@ class RLMAgent:
         responder: object | None = None,
         delegator: object | None = None,
     ):
-        self.max_steps = max_steps
-        self.max_depth = max_depth
+        self.config = config
+        self.is_delegate = is_delegate
+        self.budget_manager = budget_manager
+
+        # Use config settings if provided, otherwise use parameters
+        if config:
+            agent_config = config.delegate if is_delegate else config.root
+            self.max_steps = agent_config.max_steps
+            self.max_depth = agent_config.max_depth
+        else:
+            self.max_steps = max_steps
+            self.max_depth = max_depth
+
         self.depth = depth
         self.root_dir = Path(root_dir) if root_dir else None
 
@@ -160,7 +178,15 @@ class RLMAgent:
                         futures = {}
                         for i, subtask in enumerate(subtasks):
                             # Instantiate new agent for each subtask
-                            sub_agent = RLMAgent(max_steps=self.max_steps, max_depth=self.max_depth, depth=self.depth + 1)
+                            # Pass config and mark as delegate
+                            sub_agent = RLMAgent(
+                                max_steps=self.max_steps,
+                                max_depth=self.max_depth,
+                                depth=self.depth + 1,
+                                config=self.config,
+                                is_delegate=True,
+                                budget_manager=self.budget_manager,
+                            )
                             futures[executor.submit(sub_agent.run, subtask)] = subtask
 
                         for future in concurrent.futures.as_completed(futures):

@@ -1,44 +1,76 @@
 import argparse
+from pathlib import Path
 import dspy
 from dotenv import load_dotenv
-from src.config import get_lm, get_config
+from src.config import get_lm_for_role
 from src.core.agent import RLMAgent
+from src.core.budget import BudgetManager
+from src.core.config_loader import load_profile, ProfileConfig
 from src.core.logger import logger
 
-# Load environment variables
+# Load environment variables (for API keys only)
 load_dotenv()
 
 def main():
-    parser = argparse.ArgumentParser(description="Run the RLM Agent on a task.")
+    parser = argparse.ArgumentParser(
+        description="Run the RLM Agent on a task using YAML configuration profiles.",
+        epilog="Example: uv run python src/main.py 'Calculate fibonacci(20)' --config configs/paper-gpt5.yaml"
+    )
     parser.add_argument("task", help="The natural language task to perform.")
-    parser.add_argument("--provider", default="ollama", choices=["ollama", "gemini", "openai"], help="LLM provider to use.")
-    parser.add_argument("--model", default=None, help="Specific model name (e.g., 'qwen2.5-coder:14b', 'gemini-1.5-pro').")
-    parser.add_argument("--context", default=None, help="Path to a directory containing files to include in the context.")
-    parser.add_argument("--max-steps", type=int, default=None, help="Maximum steps per agent execution (overrides .env)")
-    parser.add_argument("--max-depth", type=int, default=None, help="Maximum recursion depth (overrides .env)")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to YAML configuration file (e.g., configs/paper-gpt5.yaml, configs/cost-effective.yaml)"
+    )
+    parser.add_argument(
+        "--context",
+        type=Path,
+        default=None,
+        help="Path to a directory containing files to include in the context."
+    )
 
     args = parser.parse_args()
 
-    # 1. Configure the LLM
+    # Load configuration profile
     try:
-        model_display = args.model if args.model else "default"
-        logger.info(f"Initializing LLM provider: {args.provider} (Model: {model_display})...")
-        lm = get_lm(args.provider, model_name=args.model)
+        logger.info(f"Loading configuration profile: {args.config}")
+        config = load_profile(args.config)
+        logger.info(f"Profile loaded: {config.profile_name}")
+        if config.description:
+            logger.info(f"Description: {config.description}")
+
+        # Initialize budget manager from config
+        BudgetManager._clear()  # Clear singleton for fresh start
+        budget_manager = BudgetManager(max_budget=config.budget.max_usd)
+
+        # Configure the root LM from profile
+        lm = get_lm_for_role("root", config, budget_manager=budget_manager)
         dspy.settings.configure(lm=lm)
+
+        logger.info(f"Root model: {config.root.provider}/{config.root.model}")
+        logger.info(f"Delegate model: {config.delegate.provider}/{config.delegate.model}")
+        logger.info(f"Budget limit: ${config.budget.max_usd:.2f}")
+        logger.info(f"Max steps: {config.root.max_steps}, Max depth: {config.root.max_depth}")
+
+    except FileNotFoundError as e:
+        logger.error(f"Config file not found: {e}")
+        logger.error(f"Available profiles in configs/: paper-gpt5.yaml, high-quality.yaml, cost-effective.yaml, hybrid.yaml, local-only.yaml")
+        return
     except Exception as e:
-        logger.error(f"Failed to initialize LLM: {e}")
+        logger.error(f"Failed to load config: {e}")
         return
 
-    # 2. Load agent configuration from .env or use defaults/CLI args
-    max_steps = args.max_steps if args.max_steps else get_config("MAX_AGENT_STEPS", 10, int)
-    max_depth = args.max_depth if args.max_depth else get_config("MAX_RECURSION_DEPTH", 3, int)
+    # Initialize Agent with config
+    agent = RLMAgent(
+        max_steps=config.root.max_steps,
+        max_depth=config.root.max_depth,
+        root_dir=args.context,
+        config=config,
+        budget_manager=budget_manager,
+    )
 
-    logger.info(f"Agent Configuration: max_steps={max_steps}, max_depth={max_depth}")
-
-    # 3. Initialize Agent
-    agent = RLMAgent(max_steps=max_steps, max_depth=max_depth, root_dir=args.context)
-
-    # 3. Run Task
+    # Run Task
     logger.info(f"Starting Agent with task: '{args.task}'")
     result = agent.run(args.task)
 
@@ -46,6 +78,16 @@ def main():
     logger.info("FINAL RESULT:")
     logger.info(result)
     logger.info("="*50)
+
+    # Print cost breakdown
+    breakdown = budget_manager.get_breakdown()
+    if breakdown:
+        logger.info("\n" + "-"*50)
+        logger.info("COST BREAKDOWN:")
+        for model_id, cost in breakdown.items():
+            logger.info(f"  {model_id}: ${cost:.4f}")
+        logger.info(f"  TOTAL: ${budget_manager.current_cost:.4f}")
+        logger.info("-"*50)
 
 if __name__ == "__main__":
     main()

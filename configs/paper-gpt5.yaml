@@ -1,0 +1,129 @@
+# Paper GPT-5 Configuration
+# Exact replication of the RLM research paper setup
+# Citation: "Recursive Language Models" (arXiv:2512.24601v1)
+#
+# "For the GPT-5 experiments, we use GPT-5-mini for the recursive LMs
+# and GPT-5 for the root LM, as we found this choice to strike a
+# powerful tradeoff between the capabilities of RLMs and the cost of
+# the recursive calls."
+#
+# GPT-5 and GPT-5-mini are now publicly available!
+
+profile_name: "Paper Configuration (GPT-5)"
+description: |
+  Direct replication of the RLM paper's configuration using GPT-5 for root
+  and GPT-5-mini for delegates. This achieved 91.33% on BrowseComp+ (1K docs)
+  and 58.00% F1 on OOLONG-Pairs in the research.
+
+  Paper results with this configuration:
+  - BrowseComp+ (1K): 91.33% accuracy
+  - OOLONG: 56.50 score
+  - OOLONG-Pairs: 58.00% F1
+  - CodeQA: 62.00% accuracy
+
+# Root agent: GPT-5 (exactly as paper used)
+root:
+  provider: openai
+  model: gpt-5  # Now publicly available!
+  max_steps: 15  # Paper used generous step limits
+  max_depth: 4   # Paper tested deep recursion
+  pricing:
+    input_per_1m: 1.25    # $1.25 per 1M input tokens (Standard tier)
+    output_per_1m: 10.00  # $10.00 per 1M output tokens
+
+# Delegate agents: GPT-5-mini (exactly as paper used)
+# Key insight from paper: "Use cheaper model for recursive calls"
+delegate:
+  provider: openai
+  model: gpt-5-mini  # Now publicly available!
+  max_steps: 10
+  max_depth: 2  # Prevent exponential cost growth
+  pricing:
+    input_per_1m: 0.25   # $0.25 per 1M input tokens (5x cheaper!)
+    output_per_1m: 2.00  # $2.00 per 1M output tokens (5x cheaper!)
+
+# Per-module configuration (paper doesn't specify, using logical defaults)
+modules:
+  # Architect: Root model for critical CODE/ANSWER/DELEGATE decisions
+  architect:
+    provider: openai
+    model: gpt-5
+    pricing:
+      input_per_1m: 1.25
+      output_per_1m: 10.00
+
+  # Coder: Delegate model works well for code generation
+  coder:
+    provider: openai
+    model: gpt-5-mini
+    pricing:
+      input_per_1m: 0.25
+      output_per_1m: 2.00
+
+  # Responder: Root model for final answer quality
+  responder:
+    provider: openai
+    model: gpt-5
+    pricing:
+      input_per_1m: 1.25
+      output_per_1m: 10.00
+
+  # Delegator: Delegate model for task decomposition
+  delegator:
+    provider: openai
+    model: gpt-5-mini
+    pricing:
+      input_per_1m: 0.15
+      output_per_1m: 0.60
+
+# Global budget limit (sum of all model costs)
+# Based on OpenAI pricing as of January 2026
+budget:
+  max_usd: 5.0  # Paper experiments averaged $0.99/task (BrowseComp+)
+  # Note: Per-model pricing is defined above in root/delegate/modules sections
+  # The budget manager sums costs from all models and enforces this global limit
+
+# DSPy configuration
+dspy:
+  max_retries: 5  # Paper used multiple attempts for validation
+  cache_enabled: true
+
+# Logging (verbose for research reproduction)
+logging:
+  level: INFO
+  file: logs/paper-gpt5-run.log
+
+# ==============================================================================
+# PAPER PERFORMANCE BENCHMARKS (with this configuration)
+# ==============================================================================
+#
+# Task: S-NIAH (Single Needle in Haystack)
+# - Context: 2^13 to 2^18 tokens
+# - Result: ~95% accuracy maintained across all lengths
+# - Base GPT-5 degraded to 60% at 2^18 tokens
+#
+# Task: BrowseComp+ (1K documents, 6M-11M tokens)
+# - RLM(GPT-5): 91.33% accuracy
+# - Base GPT-5: 0.00% (couldn't fit in context)
+# - Average cost: $0.99 per query
+#
+# Task: OOLONG (131K tokens)
+# - RLM(GPT-5): 56.50 score
+# - Base GPT-5: 44.00 score (28.4% improvement)
+#
+# Task: OOLONG-Pairs (32K tokens, quadratic complexity)
+# - RLM(GPT-5): 58.00% F1
+# - Base GPT-5: 0.04% F1 (1450x improvement!)
+#
+# Task: CodeQA (23K-4.2M tokens)
+# - RLM(GPT-5): 62.00% accuracy
+# - Base GPT-5: 24.00% accuracy (158% improvement)
+#
+# Key Finding: RLMs maintain performance as context grows, while base models
+# suffer from "context rot" - degrading quality with longer inputs.
+#
+# Cost Analysis:
+# - Median RLM cost was CHEAPER than base model (efficient context filtering)
+# - 95th percentile had high variance due to long reasoning chains
+# - Overall: Comparable cost with dramatically better performance
+# ==============================================================================
