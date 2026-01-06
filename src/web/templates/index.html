@@ -43,6 +43,44 @@
                     :disabled="isRunning"
                 ></textarea>
             </div>
+            <!-- Context Path (Optional) -->
+            <div>
+                <label for="contextPath" class="block text-sm font-medium text-gray-700 mb-2">
+                    Context Folder (Optional)
+                    <span class="text-gray-500 text-xs">— Absolute path to folder with files the agent can access</span>
+                </label>
+                <input
+                    id="contextPath"
+                    x-model="contextPath"
+                    type="text"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., /Users/yourname/data or C:\\Projects\\data"
+                    :disabled="isRunning"
+                />
+                <p class="mt-1 text-xs text-gray-500">
+                    💡 Agent can read files using Python code (e.g., <code class="bg-gray-100 px-1 rounded">pd.read_csv('data.csv')</code>).
+                    Folder contents will be listed at the start of execution.
+                </p>
+            </div>
+            <!-- Context Path (Optional) -->
+            <div>
+                <label for="contextPath" class="block text-sm font-medium text-gray-700 mb-2">
+                    Context Folder (Optional)
+                    <span class="text-gray-500 text-xs">— Absolute path to folder with files the agent can access</span>
+                </label>
+                <input
+                    id="contextPath"
+                    x-model="contextPath"
+                    type="text"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., /Users/yourname/data or C:\\Projects\\data"
+                    :disabled="isRunning"
+                />
+                <p class="mt-1 text-xs text-gray-500">
+                    💡 Agent can read files using Python code (e.g., <code class="bg-gray-100 px-1 rounded">pd.read_csv('data.csv')</code>).
+                    Folder contents will be listed at the start of execution.
+                </p>
+            </div>
 
             <!-- Submit Button -->
             <div class="flex items-center justify-between">
@@ -176,6 +214,7 @@ function taskRunner() {
 
         // Task state
         taskText: '',
+        contextPath: '',
         taskId: null,
         currentTaskId: null,  // For chat panel integration
         isRunning: false,
@@ -269,13 +308,20 @@ function taskRunner() {
 
             try {
                 // Create task
+                const requestBody = {
+                    task: this.taskText,
+                    config_name: this.selectedConfig
+                };
+
+                // Include context_path if provided
+                if (this.contextPath.trim()) {
+                    requestBody.context_path = this.contextPath.trim();
+                }
+
                 const response = await fetch('/api/tasks', {
                     method: 'POST',
                     headers: session.getHeaders(),
-                    body: JSON.stringify({
-                        task_text: this.taskText,
-                        config_name: this.selectedConfig
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!response.ok) {

@@ -433,3 +433,24 @@ class TestChatInterface:
         assert response.status_code == 200
         # Should have currentTaskId in Alpine state
         assert b"currentTaskId" in response.content
+
+class TestContextPath:
+    """Test context path functionality for file access."""
+
+    def test_home_has_context_path_field(self, client):
+        """Test that home page includes context path input field."""
+        response = client.get("/")
+        
+        assert response.status_code == 200
+        content = response.content
+        
+        # Check for context path input field
+        assert b'id="contextPath"' in content
+        assert b'x-model="contextPath"' in content
+        
+        # Check for helpful label/description
+        assert b"Context Folder" in content
+        
+        # Check that contextPath is in the component state
+        assert b"contextPath:" in content
+
