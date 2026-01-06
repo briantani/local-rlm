@@ -27,6 +27,8 @@ This project aims to replicate the core architecture of an RLM, which solves com
 
 ### Installation
 
+#### macOS / Linux
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/local-rlm.git
@@ -36,13 +38,34 @@ cd local-rlm
 uv sync
 ```
 
+#### Windows
+
+```powershell
+# Clone the repository
+git clone https://github.com/yourusername/local-rlm.git
+cd local-rlm
+
+# Install uv if not already installed
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Install dependencies with uv
+uv sync
+```
+
+**Windows-Specific Notes:**
+- **Python 3.14+**: Download from [python.org](https://www.python.org/downloads/) or use the Microsoft Store version
+- **PowerShell**: Use PowerShell (not CMD) for best compatibility with `uv` commands
+- **Path Handling**: The project uses `pathlib.Path` which automatically handles Windows path separators
+
 ---
 
 ## Configuration
 
 ### Option 1: Local Execution with Ollama (Recommended for Privacy)
 
-1. **Install Ollama** from [ollama.ai](https://ollama.ai/)
+1. **Install Ollama**
+   - **macOS/Linux**: Download from [ollama.ai](https://ollama.ai/)
+   - **Windows**: Download the Windows installer from [ollama.ai](https://ollama.ai/)
 
 2. **Pull a coding model:**
    ```bash
@@ -57,9 +80,8 @@ uv sync
    ```
 
 3. **Start the Ollama server:**
-   ```bash
-   ollama serve
-   ```
+   - **macOS/Linux**: `ollama serve`
+   - **Windows**: Ollama runs as a background service automatically after installation
 
 4. **Run the agent:**
    ```bash
@@ -71,9 +93,18 @@ uv sync
 1. **Get an API key** from [Google AI Studio](https://aistudio.google.com/apikey)
 
 2. **Create a `.env` file** in the project root:
+
+   **macOS/Linux (bash/zsh):**
    ```bash
    echo "GEMINI_API_KEY=your-api-key-here" > .env
    ```
+
+   **Windows (PowerShell):**
+   ```powershell
+   echo "GEMINI_API_KEY=your-api-key-here" | Out-File -FilePath .env -Encoding utf8
+   ```
+
+   Or simply create a `.env` file manually with any text editor.
 
 3. **Run the agent:**
    ```bash
@@ -92,8 +123,15 @@ uv sync
 1. **Get an API key** from [OpenAI Platform](https://platform.openai.com/api-keys)
 
 2. **Add to your `.env` file:**
+
+   **macOS/Linux (bash/zsh):**
    ```bash
    echo "OPENAI_API_KEY=your-api-key-here" >> .env
+   ```
+
+   **Windows (PowerShell):**
+   ```powershell
+   echo "OPENAI_API_KEY=your-api-key-here" | Out-File -FilePath .env -Append -Encoding utf8
    ```
 
 3. **Run the agent:**
@@ -115,9 +153,17 @@ For local Qwen models, use Ollama (Option 1) with `qwen2.5-coder`. For cloud acc
 1. **Use a provider like [Fireworks AI](https://fireworks.ai/)** or [Together AI](https://together.ai/) that offers Qwen models via OpenAI-compatible APIs.
 
 2. **Configure the endpoint:**
+
+   **macOS/Linux (bash/zsh):**
    ```bash
    echo "OPENAI_API_KEY=your-fireworks-key" >> .env
    echo "OPENAI_BASE_URL=https://api.fireworks.ai/inference/v1" >> .env
+   ```
+
+   **Windows (PowerShell):**
+   ```powershell
+   echo "OPENAI_API_KEY=your-fireworks-key" | Out-File -FilePath .env -Append -Encoding utf8
+   echo "OPENAI_BASE_URL=https://api.fireworks.ai/inference/v1" | Out-File -FilePath .env -Append -Encoding utf8
    ```
 
 3. **Run with the Qwen model:**
