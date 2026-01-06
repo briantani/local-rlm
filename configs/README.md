@@ -195,6 +195,7 @@ Cost = (100,000 / 1,000,000 × $2.50) + (20,000 / 1,000,000 × $10.00)
 | Task Type | Recommended Profile | Why |
 |-----------|---------------------|-----|
 | **Research replication** | `paper-gpt5` | Match academic benchmarks exactly |
+| **Complex research/reports** | `high-quality` + custom | Need strong Architect + Responder |
 | Quick calculations | `cost-effective` | Fast, cheap, sufficient quality |
 | Code generation | `hybrid` | Local Ollama is fast for code |
 | Deep analysis | `high-quality` | Premium models for nuance |
@@ -223,6 +224,39 @@ Cost = (100,000 / 1,000,000 × $2.50) + (20,000 / 1,000,000 × $10.00)
 
 - Final answer quality matters
 - Consider: Same as root or slightly better
+- **For research/reports**: Use premium model (GPT-4o, Gemini 2.5 Pro)
+
+**Example: Complex Research Tasks**
+
+For tasks like "Analyze AI trends 2020-2025 and produce a comprehensive report
+with charts":
+
+```yaml
+# Custom research profile
+root:
+  provider: openai
+  model: gpt-4o  # Strong strategic reasoning
+
+modules:
+  architect:
+    provider: openai
+    model: gpt-4o  # Critical: needs to plan investigation strategy
+
+  coder:
+    provider: ollama
+    model: qwen2.5-coder:7b  # Utilitarian: just needs to work
+
+  responder:
+    provider: openai
+    model: gpt-4o  # Critical: final report quality
+```
+
+**Why this works:**
+
+- Architect breaks down research into subtasks (literature review, data
+  analysis, trend identification)
+- Coder generates analysis/visualization code (cheaper model is fine)
+- Responder synthesizes findings into professional report (needs strong model)
 
 ### Budget Management
 
