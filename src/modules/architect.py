@@ -1,5 +1,7 @@
 import dspy
-import os
+
+from src.core.module_loader import load_compiled_module
+
 
 class ArchitectSignature(dspy.Signature):
     """
@@ -31,11 +33,8 @@ class Architect(dspy.Module):
             ).with_inputs("query", "data_desc"),
         ]
 
-        # Load compiled weights if available
-        compiled_path = os.path.join(os.path.dirname(__file__), "compiled_architect.json")
-        if os.path.exists(compiled_path):
-            # print(f"Loading optimized Architect from {compiled_path}")
-            self.load(compiled_path)
+        # Load compiled weights if available (using centralized loader)
+        load_compiled_module(self, "architect")
 
     def forward(self, query: str, data_desc: str = "") -> dspy.Prediction:
         prediction = self.decide(query=query, data_desc=data_desc)

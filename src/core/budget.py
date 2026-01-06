@@ -1,24 +1,41 @@
 import threading
+from functools import wraps
 from typing import Any
+
 import dspy
+
 
 class BudgetExceededError(Exception):
     """Raised when the token budget is exceeded."""
     pass
 
+
+def singleton(cls):
+    """Thread-safe singleton decorator."""
+    instances = {}
+    lock = threading.Lock()
+
+    @wraps(cls)
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            with lock:
+                if cls not in instances:
+                    instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    # Allow clearing for testing
+    get_instance._clear = lambda: instances.pop(cls, None)
+    return get_instance
+
+
+@singleton
 class BudgetManager:
     """
     Thread-safe singleton to track token usage and cost.
-    """
-    _instance = None
-    _lock = threading.Lock()
 
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            with cls._lock:
-                if not cls._instance:
-                    cls._instance = super(BudgetManager, cls).__new__(cls)
-        return cls._instance
+    Uses a decorator-based singleton pattern for cleaner implementation.
+    Call BudgetManager._clear() in tests to reset the singleton.
+    """
 
     def __init__(self, max_budget: float = 1.0):
         """
@@ -27,23 +44,17 @@ class BudgetManager:
         Args:
             max_budget: Maximum allowed cost in USD. Default is $1.00.
         """
-        # Prevent re-initialization if already initialized
-        if hasattr(self, "_initialized") and self._initialized:
-            return
-
         self.max_budget = max_budget
         self.current_cost = 0.0
         self.total_input_tokens = 0
         self.total_output_tokens = 0
-        self.lock = threading.Lock()
+        self._lock = threading.Lock()
 
         # Pricing for Gemini 1.5 Flash (approximate)
         # Input: $0.075 / 1M tokens
         # Output: $0.30 / 1M tokens
         self.input_price_per_1m = 0.075
         self.output_price_per_1m = 0.30
-
-        self._initialized = True
 
     def add_usage(self, input_tokens: int, output_tokens: int):
         """
@@ -53,7 +64,7 @@ class BudgetManager:
         output_cost = (output_tokens / 1_000_000) * self.output_price_per_1m
         total_cost = input_cost + output_cost
 
-        with self.lock:
+        with self._lock:
             self.total_input_tokens += input_tokens
             self.total_output_tokens += output_tokens
             self.current_cost += total_cost
@@ -63,7 +74,7 @@ class BudgetManager:
         Checks if the current cost exceeds the maximum budget.
         Raises BudgetExceededError if limit is reached.
         """
-        with self.lock:
+        with self._lock:
             if self.current_cost >= self.max_budget:
                 raise BudgetExceededError(
                     f"Budget exceeded! Current cost: ${self.current_cost:.6f}, Limit: ${self.max_budget:.6f}"
@@ -71,10 +82,11 @@ class BudgetManager:
 
     def reset(self):
         """Resets the budget counters (useful for testing)."""
-        with self.lock:
+        with self._lock:
             self.current_cost = 0.0
             self.total_input_tokens = 0
             self.total_output_tokens = 0
+
 
 class BudgetWrapper(dspy.BaseLM):
     """

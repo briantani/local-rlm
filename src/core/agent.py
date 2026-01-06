@@ -1,5 +1,7 @@
 import concurrent.futures
 from pathlib import Path
+from typing import Protocol, runtime_checkable
+
 from src.core.logger import logger
 from src.core.repl import PythonREPL
 from src.modules.architect import Architect
@@ -8,25 +10,60 @@ from src.modules.responder import Responder
 from src.modules.delegator import Delegator
 from src.core.explorer import scan_directory
 
+
+# Protocol definitions for dependency injection
+@runtime_checkable
+class CodeExecutor(Protocol):
+    """Protocol for code execution backends."""
+    def execute(self, code: str) -> str: ...
+
+
+@runtime_checkable
+class TaskRouter(Protocol):
+    """Protocol for task routing/decision making."""
+    def __call__(self, query: str, data_desc: str) -> object: ...
+
+
+@runtime_checkable
+class CodeGenerator(Protocol):
+    """Protocol for code generation modules."""
+    def __call__(self, task: str, context_summary: str) -> object: ...
+
+
 class RLMAgent:
     """
     The main Recursive Language Model Agent.
     Orchestrates the Architect, Coder, and REPL to solve tasks.
     Supports recursive delegation handling.
+
+    Supports dependency injection for all components to enable testing.
     """
-    def __init__(self, max_steps: int = 10, max_depth: int = 3, depth: int = 0, root_dir: str | Path | None = None, coder=None):
+    def __init__(
+        self,
+        max_steps: int = 10,
+        max_depth: int = 3,
+        depth: int = 0,
+        root_dir: str | Path | None = None,
+        # Dependency injection parameters
+        repl: CodeExecutor | None = None,
+        architect: TaskRouter | None = None,
+        coder: CodeGenerator | None = None,
+        responder: object | None = None,
+        delegator: object | None = None,
+    ):
         self.max_steps = max_steps
         self.max_depth = max_depth
         self.depth = depth
         self.root_dir = Path(root_dir) if root_dir else None
 
-        self.repl = PythonREPL()
-        self.architect = Architect()
+        # Use injected dependencies or create defaults
+        self.repl = repl if repl else PythonREPL()
+        self.architect = architect if architect else Architect()
         self.coder = coder if coder else Coder()
-        self.responder = Responder()
-        self.delegator = Delegator()
+        self.responder = responder if responder else Responder()
+        self.delegator = delegator if delegator else Delegator()
 
-        self.history: list[tuple[str, str]] = [] # List of (Action/Code, Output)
+        self.history: list[tuple[str, str]] = []  # List of (Action/Code, Output)
 
         # Initialize context with file listing if root_dir is provided
         if self.root_dir and self.root_dir.exists():
