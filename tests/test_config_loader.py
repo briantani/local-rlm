@@ -21,10 +21,9 @@ from src.core.config_loader import (
     AgentConfig,
     PricingConfig,
     ModulesConfig,
-    BudgetConfig,
     get_model_config_for_role,
 )
-from src.core.budget import BudgetManager, BudgetExceededError, ModelUsage
+from src.core.budget import BudgetManager, BudgetExceededError
 
 
 # =============================================================================

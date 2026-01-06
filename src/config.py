@@ -4,9 +4,7 @@ from dotenv import load_dotenv
 from src.core.budget import BudgetManager, BudgetWrapper
 from src.core.config_loader import (
     ProfileConfig,
-    ModelConfig,
     get_model_config_for_role,
-    load_profile,
 )
 
 load_dotenv()

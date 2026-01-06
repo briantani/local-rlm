@@ -9,8 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from src.rlm.services import SessionService
-from src.rlm.services.session_service import Session
-from src.web.dependencies import get_session_service, get_current_session
+from src.web.dependencies import get_session_service
 
 router = APIRouter()
 

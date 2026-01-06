@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, AsyncGenerator
 
 from src.rlm.services import TaskService
-from src.rlm.services.task_service import StepInfo, TaskResult
+from src.rlm.services.task_service import StepInfo
 from src.web.database import TaskStatus, update_task_status
 
 logger = logging.getLogger(__name__)

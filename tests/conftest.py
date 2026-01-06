@@ -50,8 +50,6 @@ def get_lm_for_testing(provider: str = "ollama", model: str | None = None):
         return get_lm_for_role("root", config, budget_manager=budget_manager)
     except Exception as e:
         pytest.skip(f"Could not load test config: {e}")
-    budget.reset()
-    budget.max_budget = 1.0
 
 
 class MockArchitect:

@@ -4,7 +4,6 @@ WebSocket Streaming.
 Provides real-time task updates via WebSocket connections.
 """
 
-import asyncio
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 

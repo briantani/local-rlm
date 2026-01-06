@@ -4,32 +4,26 @@ Task Routes.
 Handles task creation, status checking, and history.
 """
 
-import asyncio
 import secrets
-from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from src.rlm.services import ConfigService, TaskService
+from src.rlm.services import ConfigService
 from src.rlm.services.session_service import Session
-from src.rlm.services.task_service import StepInfo
 from src.web.dependencies import (
     get_config_service,
     get_current_session,
-    get_task_service,
     get_services,
 )
 from src.web.database import (
     TaskRecord,
-    TaskStatus,
     create_task,
     get_task,
     get_tasks_for_session,
-    update_task_status,
 )
-from src.web.task_runner import task_updates, run_task_async
+from src.web.task_runner import run_task_async
 
 router = APIRouter()
 

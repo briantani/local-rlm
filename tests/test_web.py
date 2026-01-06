@@ -6,9 +6,7 @@ Tests REST endpoints, WebSocket streaming, and database persistence.
 
 import asyncio
 import pytest
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest_asyncio
 from fastapi.testclient import TestClient
@@ -16,14 +14,12 @@ from fastapi.testclient import TestClient
 # Import app after all patches are ready
 from src.web.app import create_app
 from src.web.database import (
-    TaskRecord,
     TaskStatus,
     init_db,
     create_task,
     get_task,
     get_tasks_for_session,
     update_task_status,
-    DB_PATH,
 )
 
 
@@ -42,7 +38,6 @@ def setup_test_db(tmp_path_factory):
     db_module.DB_PATH = test_db_dir / "test_rlm.db"
 
     # Initialize DB synchronously using new event loop
-    import asyncio
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:

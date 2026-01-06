@@ -124,6 +124,7 @@ class TestAgentUnitTests:
 
 @pytest.fixture(scope="module")
 def setup_dspy_ollama():
+    from conftest import get_lm_for_testing
     try:
         lm = get_lm_for_testing("ollama")
         dspy.settings.configure(lm=lm)

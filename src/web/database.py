@@ -5,7 +5,6 @@ Provides async database access for persisting task history.
 API keys are NEVER stored in the database.
 """
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass

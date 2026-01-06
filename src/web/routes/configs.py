@@ -5,10 +5,10 @@ Handles listing and viewing configuration profiles.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from src.rlm.services import ConfigService
-from src.rlm.services.config_service import ProfileSummary, ValidationResult
+from src.rlm.services.config_service import ProfileSummary
 from src.web.dependencies import get_config_service
 
 router = APIRouter()
