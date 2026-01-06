@@ -109,7 +109,7 @@ async def create_task(
             INSERT INTO tasks (id, session_id, task_text, config_name, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (task_id, session_id, task_text, config_name, TaskStatus.PENDING.value, now),
+            (task_id, session_id, task_text, config_name, TaskStatus.PENDING.value, now.isoformat()),
         )
         await db.commit()
 
@@ -146,7 +146,7 @@ async def update_task_status(
                 SET status = ?, result = ?, completed_at = ?
                 WHERE id = ?
                 """,
-                (status.value, json.dumps(result) if result else None, datetime.now(), task_id),
+                (status.value, json.dumps(result) if result else None, datetime.now().isoformat(), task_id),
             )
         else:
             await db.execute(
@@ -218,6 +218,6 @@ def _row_to_record(row: aiosqlite.Row) -> TaskRecord:
         config_name=row["config_name"],
         status=TaskStatus(row["status"]),
         result=json.loads(row["result"]) if row["result"] else None,
-        created_at=datetime.fromisoformat(row["created_at"]) if isinstance(row["created_at"], str) else row["created_at"],
-        completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] and isinstance(row["completed_at"], str) else row["completed_at"],
+        created_at=datetime.fromisoformat(row["created_at"]),
+        completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
     )

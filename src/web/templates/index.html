@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}RLM Agent - Home{% endblock %}
+
+{% block content %}
+<div x-data="taskRunner()" x-init="init()" class="space-y-6">
+
+    <!-- Task Input Card -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">🎯 Run a Task</h2>
+
+        <form @submit.prevent="submitTask" class="space-y-4">
+            <!-- Config Selector -->
+            <div>
+                <label for="config" class="block text-sm font-medium text-gray-700 mb-2">
+                    Configuration Profile
+                </label>
+                <select
+                    id="config"
+                    x-model="selectedConfig"
+                    @change="onConfigChange"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    :disabled="isRunning"
+                >
+                    <option value="">Loading configs...</option>
+                </select>
+                <p class="mt-1 text-sm text-gray-500" x-show="configDetails" x-cloak>
+                    <span x-text="configDetails"></span>
+                </p>
+            </div>
+
+            <!-- Task Input -->
+            <div>
+                <label for="task" class="block text-sm font-medium text-gray-700 mb-2">
+                    Task Description
+                </label>
+                <textarea
+                    id="task"
+                    x-model="taskText"
+                    rows="4"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Calculate the 100th fibonacci number"
+                    :disabled="isRunning"
+                ></textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex items-center justify-between">
+                <button
+                    type="submit"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                    :disabled="!canSubmit"
+                >
+                    <span x-show="!isRunning">▶️ Run Task</span>
+                    <span x-show="isRunning" x-cloak>⏳ Running...</span>
+                </button>
+
+                <button
+                    v-show="isRunning"
+                    @click="stopTask"
+                    type="button"
+                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
+                    x-show="isRunning"
+                    x-cloak
+                >
+                    ⏹️ Stop
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Execution Area -->
+    <div x-show="taskId" x-cloak class="space-y-4">
+
+        <!-- Steps Container -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                📋 Execution Steps
+            </h3>
+
+            <div class="space-y-3">
+                <template x-for="(step, index) in steps" :key="index">
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <!-- Step Header -->
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">
+                                Step <span x-text="index + 1"></span>: <span x-text="step.action"></span>
+                            </span>
+                            <span
+                                class="text-xs px-2 py-1 rounded"
+                                :class="{
+                                    'bg-blue-100 text-blue-800': step.status === 'running',
+                                    'bg-green-100 text-green-800': step.status === 'complete',
+                                    'bg-red-100 text-red-800': step.status === 'error'
+                                }"
+                                x-text="step.status"
+                            ></span>
+                        </div>
+
+                        <!-- Code Block (if exists) -->
+                        <div x-show="step.code" x-cloak class="mt-3">
+                            <div class="text-xs text-gray-500 mb-1">Code:</div>
+                            <pre class="bg-gray-900 text-gray-100 p-3 rounded text-sm overflow-x-auto"><code x-text="step.code"></code></pre>
+                        </div>
+
+                        <!-- Output Block (if exists) -->
+                        <div x-show="step.output" x-cloak class="mt-3">
+                            <div class="text-xs text-gray-500 mb-1">Output:</div>
+                            <pre class="bg-gray-50 border border-gray-200 p-3 rounded text-sm overflow-x-auto"><code x-text="step.output"></code></pre>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Empty State -->
+                <div x-show="steps.length === 0" x-cloak class="text-center py-8 text-gray-400">
+                    Waiting for execution to start...
+                </div>
+            </div>
+        </div>
+
+        <!-- Final Result -->
+        <div x-show="result" x-cloak class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                ✅ Result
+            </h3>
+
+            <div class="prose max-w-none">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p class="text-gray-900" x-text="result?.answer"></p>
+                </div>
+
+                <!-- Cost Breakdown -->
+                <div x-show="result?.cost" x-cloak class="mt-4 text-sm text-gray-600">
+                    <div class="flex items-center justify-between">
+                        <span>💰 Cost:</span>
+                        <span class="font-mono" x-text="'$' + (result?.cost || 0).toFixed(4)"></span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>⏱️ Duration:</span>
+                        <span x-text="result?.duration"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Display -->
+        <div x-show="error" x-cloak class="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-red-900 mb-2">
+                ❌ Error
+            </h3>
+            <p class="text-red-700" x-text="error"></p>
+        </div>
+    </div>
+
+</div>
+
+<!-- API Key Modal Component -->
+{% include 'components/api_key_modal.html' %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function taskRunner() {
+    return {
+        // Config state
+        configs: [],
+        selectedConfig: '',
+        configDetails: '',
+        requiredProviders: [],
+
+        // Task state
+        taskText: '',
+        taskId: null,
+        isRunning: false,
+
+        // Execution state
+        steps: [],
+        result: null,
+        error: null,
+
+        // WebSocket
+        ws: null,
+
+        async init() {
+            await this.loadConfigs();
+        },
+
+        async loadConfigs() {
+            try {
+                const response = await fetch('/api/configs');
+                const data = await response.json();
+                this.configs = data;
+
+                // Populate select options
+                const select = document.getElementById('config');
+                select.innerHTML = '<option value="">Select a configuration...</option>';
+                data.forEach(config => {
+                    const option = document.createElement('option');
+                    option.value = config.name;
+                    option.textContent = `${config.name} - ${config.description}`;
+                    select.appendChild(option);
+                });
+
+                // Select first config by default
+                if (data.length > 0) {
+                    this.selectedConfig = data[0].name;
+                    await this.onConfigChange();
+                }
+            } catch (e) {
+                console.error('Failed to load configs:', e);
+            }
+        },
+
+        async onConfigChange() {
+            if (!this.selectedConfig) return;
+
+            try {
+                const response = await fetch(`/api/configs/${this.selectedConfig}`);
+                const config = await response.json();
+
+                this.configDetails = config.description;
+                this.requiredProviders = config.required_providers || [];
+
+                // Check if API keys are needed
+                await this.checkApiKeys();
+            } catch (e) {
+                console.error('Failed to load config details:', e);
+            }
+        },
+
+        async checkApiKeys() {
+            const session = Alpine.store('sessionStore');
+            await session.checkApiKeys();
+
+            // Check if required keys are missing
+            const missingKeys = this.requiredProviders.filter(
+                provider => !session.apiKeys[provider.toLowerCase()]
+            );
+
+            if (missingKeys.length > 0) {
+                // Open modal to configure API keys
+                this.$dispatch('open-api-key-modal', { providers: missingKeys });
+            }
+        },
+
+        get canSubmit() {
+            return this.taskText.trim() && this.selectedConfig && !this.isRunning;
+        },
+
+        async submitTask() {
+            if (!this.canSubmit) return;
+
+            const session = Alpine.store('sessionStore');
+
+            // Reset state
+            this.steps = [];
+            this.result = null;
+            this.error = null;
+            this.isRunning = true;
+
+            try {
+                // Create task
+                const response = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: session.getHeaders(),
+                    body: JSON.stringify({
+                        task_text: this.taskText,
+                        config_name: this.selectedConfig
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to create task');
+                }
+
+                const task = await response.json();
+                this.taskId = task.task_id;
+
+                // Connect to WebSocket for real-time updates
+                this.connectWebSocket();
+
+            } catch (e) {
+                this.error = e.message;
+                this.isRunning = false;
+            }
+        },
+
+        connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/tasks/${this.taskId}`;
+
+            this.ws = new WebSocket(wsUrl);
+
+            this.ws.onmessage = (event) => {
+                const update = JSON.parse(event.data);
+                this.handleUpdate(update);
+            };
+
+            this.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.error = 'Connection error occurred';
+            };
+
+            this.ws.onclose = () => {
+                this.isRunning = false;
+            };
+        },
+
+        handleUpdate(update) {
+            switch (update.type) {
+                case 'status':
+                    // Status update
+                    break;
+
+                case 'step':
+                    // New step started
+                    this.steps.push({
+                        action: update.data.action,
+                        status: 'running',
+                        code: null,
+                        output: null
+                    });
+                    break;
+
+                case 'code':
+                    // Code generated
+                    if (this.steps.length > 0) {
+                        this.steps[this.steps.length - 1].code = update.data.code;
+                    }
+                    break;
+
+                case 'output':
+                    // Code execution output
+                    if (this.steps.length > 0) {
+                        this.steps[this.steps.length - 1].output = update.data.output;
+                    }
+                    break;
+
+                case 'complete':
+                    // Task completed
+                    if (this.steps.length > 0) {
+                        this.steps[this.steps.length - 1].status = 'complete';
+                    }
+                    this.result = update.data;
+                    this.isRunning = false;
+                    if (this.ws) {
+                        this.ws.close();
+                    }
+                    break;
+
+                case 'error':
+                    // Task failed
+                    if (this.steps.length > 0) {
+                        this.steps[this.steps.length - 1].status = 'error';
+                    }
+                    this.error = update.data.error;
+                    this.isRunning = false;
+                    if (this.ws) {
+                        this.ws.close();
+                    }
+                    break;
+            }
+        },
+
+        stopTask() {
+            if (this.ws) {
+                this.ws.close();
+            }
+            this.isRunning = false;
+        }
+    };
+}
+</script>
+{% endblock %}

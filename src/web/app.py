@@ -8,9 +8,10 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from src.web.dependencies import get_services
 from src.web.routes import configs, sessions, tasks
@@ -76,6 +77,15 @@ def create_app() -> FastAPI:
     static_path = Path(__file__).parent / "static"
     if static_path.exists():
         app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+
+    # Setup templates
+    templates_path = Path(__file__).parent / "templates"
+    templates = Jinja2Templates(directory=str(templates_path))
+
+    @app.get("/", tags=["UI"])
+    async def index(request: Request):
+        """Render the main UI page."""
+        return templates.TemplateResponse("index.html", {"request": request})
 
     @app.get("/health", tags=["Health"])
     async def health_check():

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RLM Agent{% endblock %}</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/app.css">
+
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900">
+                        🧠 RLM Agent
+                    </h1>
+                    <span class="ml-3 text-sm text-gray-500">
+                        Recursive Language Model
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div x-data="sessionStore" class="text-sm text-gray-600">
+                        Session: <span class="font-mono text-xs" x-text="sessionId.slice(0, 8)"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-12 py-6 border-t border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
+            <p>RLM Agent - MIT License</p>
+        </div>
+    </footer>
+
+    <!-- Global Alpine.js State -->
+    <script>
+        // Session management store
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('sessionStore', {
+                sessionId: null,
+                apiKeys: {
+                    gemini: false,
+                    openai: false
+                },
+
+                async init() {
+                    // Check if session exists in localStorage
+                    let sessionId = localStorage.getItem('rlm_session_id');
+
+                    if (!sessionId) {
+                        // Create a new session
+                        const response = await fetch('/api/sessions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            sessionId = data.session_id;
+                            localStorage.setItem('rlm_session_id', sessionId);
+                        } else {
+                            console.error('Failed to create session');
+                            return;
+                        }
+                    }
+
+                    this.sessionId = sessionId;
+                    await this.checkApiKeys();
+                },
+
+                async checkApiKeys() {
+                    if (!this.sessionId) return;
+
+                    const response = await fetch(`/api/sessions/${this.sessionId}/keys/status`, {
+                        headers: { 'X-Session-ID': this.sessionId }
+                    });
+
+                    if (response.ok) {
+                        this.apiKeys = await response.json();
+                    }
+                },
+
+                async setApiKey(provider, key) {
+                    if (!this.sessionId) return;
+
+                    const response = await fetch(`/api/sessions/${this.sessionId}/keys`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Session-ID': this.sessionId
+                        },
+                        body: JSON.stringify({ provider, api_key: key })
+                    });
+
+                    if (response.ok) {
+                        await this.checkApiKeys();
+                        return true;
+                    }
+                    return false;
+                },
+
+                getHeaders() {
+                    return {
+                        'Content-Type': 'application/json',
+                        'X-Session-ID': this.sessionId
+                    };
+                }
+            });
+
+            // Initialize session on page load
+            Alpine.store('sessionStore').init();
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

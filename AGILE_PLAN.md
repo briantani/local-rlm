@@ -1322,11 +1322,26 @@ src/web/
 
 ### **🛑 Definition of Done**
 
-* [ ] Home page with task input
-* [ ] Config selector dropdown
-* [ ] API key configuration modal
-* [ ] Real-time execution streaming
-* [ ] Result display with cost breakdown
+* [x] Home page with task input
+* [x] Config selector dropdown
+* [x] API key configuration modal
+* [x] Real-time execution streaming
+* [x] Result display with cost breakdown
+
+**Implemented Files:**
+- `src/web/templates/base.html` - Base template with Tailwind, HTMX, Alpine.js
+- `src/web/templates/index.html` - Main task runner page with WebSocket integration
+- `src/web/templates/components/api_key_modal.html` - API key configuration modal
+- `src/web/static/css/app.css` - Custom styles
+- Updated `src/web/app.py` - Added Jinja2Templates and home route
+
+**UI Features:**
+- Session management in localStorage
+- Dynamic config selection with required API key detection
+- Real-time step-by-step execution display
+- WebSocket streaming of code, output, and results
+- Cost breakdown display
+- Mobile-responsive design with Tailwind CSS
 
 ---
 
