@@ -109,12 +109,46 @@ async def send_chat_message(task_id: str, request: ChatMessageRequest):
 
     try:
         # Execute follow-up query with REPL context
-        # TODO: Implement REPL state persistence (Task 3)
-        # For now, return a placeholder response
-        response_text = (
-            f"Follow-up query received: {request.message}\n\n"
-            "Note: REPL state persistence is not yet implemented. "
-            "This is a placeholder response."
+        # Get session and create task service
+        services_container = get_services()
+        session_service = services_container.session_service
+        session = session_service.get_session(task.session_id)
+        
+        if not session:
+            raise HTTPException(
+                status_code=400,
+                detail="Session not found. The original session may have expired."
+            )
+        
+        task_service = services_container.get_task_service(session)
+
+        # Check if REPL state exists
+        if not task_service.has_repl_state(task_id):
+            error_msg = (
+                "REPL state not available for this task. "
+                "The task may not have completed successfully, "
+                "or the state was cleared."
+            )
+            logger.warning(f"No REPL state for task {task_id}")
+
+            # Store error message
+            assistant_message = await create_chat_message(
+                task_id=task_id,
+                role=MessageRole.ASSISTANT,
+                content=error_msg,
+            )
+
+            return {
+                "response": error_msg,
+                "message_id": assistant_message.id,
+                "timestamp": assistant_message.timestamp.isoformat(),
+            }
+
+        # Run follow-up query with stored REPL
+        response_text = task_service.run_followup(
+            task_id=task_id,
+            query=request.message,
+            config_name=task.config_name,
         )
 
         # Store assistant response
@@ -130,6 +164,13 @@ async def send_chat_message(task_id: str, request: ChatMessageRequest):
             "timestamp": assistant_message.timestamp.isoformat(),
         }
 
+    except ValueError as e:
+        # REPL state not found
+        logger.error(f"REPL state error for task {task_id}: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
     except Exception as e:
         logger.error(f"Error processing chat message for task {task_id}: {e}")
         raise HTTPException(

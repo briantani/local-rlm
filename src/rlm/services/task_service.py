@@ -9,6 +9,7 @@ Phase 12: Core Library Refactoring
 
 import logging
 import os
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +21,7 @@ from src.config import get_lm_for_role
 from src.core.agent import RLMAgent
 from src.core.budget import BudgetManager
 from src.core.config_loader import ProfileConfig
+from src.core.repl import PythonREPL
 from src.rlm.services.config_service import ConfigService
 from src.rlm.services.session_service import Session
 
@@ -78,7 +80,12 @@ class TaskService:
     - Budget management
     - Agent creation and execution
     - Step-by-step progress callbacks
+    - REPL state persistence for follow-up queries
     """
+
+    # Class-level REPL storage (in-memory, per task_id)
+    _repl_storage: dict[str, PythonREPL] = {}
+    _storage_lock = threading.Lock()
 
     def __init__(
         self,
@@ -101,6 +108,7 @@ class TaskService:
         config_name: str,
         context_path: Path | None = None,
         on_step: StepCallback | None = None,
+        task_id: str | None = None,
     ) -> TaskResult:
         """
         Execute a task with the RLM agent.
@@ -110,6 +118,7 @@ class TaskService:
             config_name: Name of config profile (e.g., "cost-effective")
             context_path: Optional directory for file context
             on_step: Callback for streaming progress updates
+            task_id: Optional task ID for REPL state persistence
 
         Returns:
             TaskResult with answer, history, and cost breakdown
@@ -195,6 +204,12 @@ class TaskService:
         # Run task
         answer = agent.run(task)
         completed_at = datetime.now()
+
+        # Store REPL state for follow-up queries
+        if task_id:
+            with self._storage_lock:
+                self._repl_storage[task_id] = agent.repl
+                logger.info(f"Stored REPL state for task {task_id}")
 
         # Get cost breakdown
         breakdown = budget_manager.get_breakdown()
@@ -360,3 +375,93 @@ class TaskService:
             "root_model": f"{config.root.provider}/{config.root.model}",
             "estimated_steps": estimated_steps,
         }
+
+    def run_followup(
+        self,
+        task_id: str,
+        query: str,
+        config_name: str,
+    ) -> str:
+        """
+        Execute a follow-up query using stored REPL state.
+
+        Args:
+            task_id: Task identifier with stored REPL state
+            query: Follow-up query to execute
+            config_name: Config profile to use
+
+        Returns:
+            Agent's response to the query
+
+        Raises:
+            ValueError: If no REPL state found for task_id
+        """
+        # Retrieve stored REPL
+        with self._storage_lock:
+            repl = self._repl_storage.get(task_id)
+
+        if not repl:
+            raise ValueError(
+                f"No REPL state found for task {task_id}. "
+                "The task may not have completed or was cleaned up."
+            )
+
+        # Get API keys and load config
+        api_keys = self._get_api_keys()
+        config = self._load_config_with_keys(config_name, api_keys)
+        self._validate_api_keys(config, api_keys)
+        self._configure_environment(api_keys)
+
+        # Initialize budget manager
+        BudgetManager._clear()
+        budget_manager = BudgetManager(max_budget=config.budget.max_usd)
+
+        # Configure DSPy
+        lm = get_lm_for_role("root", config, budget_manager=budget_manager)
+        dspy.settings.configure(lm=lm)
+
+        logger.info(f"Running follow-up query for task {task_id}")
+        logger.info(f"REPL has {len(repl.globals)} globals, {len(repl.locals)} locals")
+
+        # Create agent with existing REPL
+        agent = RLMAgent(
+            max_steps=config.root.max_steps,
+            max_depth=config.root.max_depth,
+            config=config,
+            budget_manager=budget_manager,
+            repl=repl,  # Pass existing REPL
+        )
+
+        # Run follow-up query
+        answer = agent.run(query)
+
+        # Update stored REPL (it may have new variables)
+        with self._storage_lock:
+            self._repl_storage[task_id] = agent.repl
+
+        return answer
+
+    def clear_repl_state(self, task_id: str) -> None:
+        """
+        Clear stored REPL state for a task.
+
+        Args:
+            task_id: Task identifier
+        """
+        with self._storage_lock:
+            if task_id in self._repl_storage:
+                del self._repl_storage[task_id]
+                logger.info(f"Cleared REPL state for task {task_id}")
+
+    def has_repl_state(self, task_id: str) -> bool:
+        """
+        Check if REPL state exists for a task.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            True if REPL state exists
+        """
+        with self._storage_lock:
+            return task_id in self._repl_storage

@@ -430,3 +430,85 @@ class TestTaskServiceMocked:
         assert "max_budget" in estimate
         assert estimate["estimated_cost"] >= 0
         assert estimate["max_budget"] > 0
+
+
+class TestREPLPersistence:
+    """Tests for REPL state persistence in TaskService."""
+
+    def test_repl_storage_and_retrieval(self):
+        """Test that REPL state is stored and can be retrieved."""
+        from src.rlm.services.task_service import TaskService
+        from src.core.repl import PythonREPL
+
+        config_service = ConfigService()
+        task_service = TaskService(config_service)
+
+        # Clear any existing state
+        task_service._repl_storage.clear()
+
+        # Create a REPL with some state
+        repl = PythonREPL()
+        repl.execute("x = 42")
+        repl.execute("y = 'hello'")
+
+        # Manually store it
+        task_id = "test-task-123"
+        task_service._repl_storage[task_id] = repl
+
+        # Check has_repl_state
+        assert task_service.has_repl_state(task_id)
+        assert not task_service.has_repl_state("nonexistent-task")
+
+        # Retrieve and verify
+        with task_service._storage_lock:
+            retrieved_repl = task_service._repl_storage[task_id]
+
+        # Variables are stored in locals dict
+        assert retrieved_repl.locals.get("x") == 42
+        assert retrieved_repl.locals.get("y") == "hello"
+
+    def test_clear_repl_state(self):
+        """Test that REPL state can be cleared."""
+        from src.rlm.services.task_service import TaskService
+        from src.core.repl import PythonREPL
+
+        config_service = ConfigService()
+        task_service = TaskService(config_service)
+
+        # Store a REPL
+        task_id = "test-task-456"
+        repl = PythonREPL()
+        repl.execute("z = 100")
+        task_service._repl_storage[task_id] = repl
+
+        # Verify it exists
+        assert task_service.has_repl_state(task_id)
+
+        # Clear it
+        task_service.clear_repl_state(task_id)
+
+        # Verify it's gone
+        assert not task_service.has_repl_state(task_id)
+
+        # Clearing nonexistent state should not raise
+        task_service.clear_repl_state("nonexistent")
+
+    def test_followup_without_repl_raises_error(self):
+        """Test that run_followup raises ValueError if no REPL state exists."""
+        from src.rlm.services.task_service import TaskService
+
+        config_service = ConfigService()
+        task_service = TaskService(config_service)
+
+        # Clear any state
+        task_service._repl_storage.clear()
+
+        with pytest.raises(ValueError) as exc_info:
+            task_service.run_followup(
+                task_id="nonexistent-task",
+                query="What is x?",
+                config_name="cost-effective",
+            )
+
+        assert "No REPL state found" in str(exc_info.value)
+

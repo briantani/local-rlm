@@ -454,6 +454,51 @@ class TestChatEndpoints:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
+    @pytest.mark.asyncio
+    async def test_chat_without_repl_state(self, client, test_db):
+        """Test chat endpoint when no REPL state exists."""
+        # Create a session using the same singleton service the route uses
+        from src.web.dependencies import get_services
+        services = get_services()
+        session = services.session_service.create_session()
+        session_id = session.session_id
+
+        # Create a completed task but don't store REPL state
+        task = await create_task("chat-task-3", session_id, "Test task", "cost-effective")
+        await update_task_status(task.id, TaskStatus.COMPLETED, {"answer": "42"})
+
+        # Try to send a chat message
+        response = client.post(
+            f"/api/tasks/{task.id}/chat",
+            json={"message": "What is x?"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "response" in data
+        # Should return an error message about missing REPL state
+        assert "REPL state not available" in data["response"]
+
+    def test_chat_endpoint_with_running_task(self, client, test_db):
+        """Test that chat endpoint rejects running tasks."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+
+        # Create a running task
+        task = loop.run_until_complete(
+            create_task("chat-task-running", "session-4", "Test task", "config")
+        )
+        loop.run_until_complete(update_task_status(task.id, TaskStatus.RUNNING))
+
+        # Try to send a chat message
+        response = client.post(
+            f"/api/tasks/{task.id}/chat",
+            json={"message": "Hello"}
+        )
+
+        assert response.status_code == 400
+        assert "not completed" in response.json()["detail"].lower()
+
 
 # =============================================================================
 # Health Check Test

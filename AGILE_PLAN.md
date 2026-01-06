@@ -1395,22 +1395,40 @@ src/web/
 
 1. ✅ **Chat Panel**: Alpine.js component with message display, input handling
 2. ✅ **Chat API**: GET/POST `/api/tasks/{task_id}/chat` endpoints
-3. ⏸️ **REPL Persistence**: State preservation NOT YET implemented (placeholder in code)
+3. ✅ **REPL Persistence**: State preservation implemented in TaskService with thread-safe storage
 4. ✅ **Message History**: SQLite `chat_messages` table with task_id FK
 5. ✅ **UI Integration**: Chat panel integrated into home page with conditional display
-6. ✅ **Tests**: 4 chat UI tests + 4 backend API tests
+6. ✅ **Tests**: 3 REPL persistence + 6 chat endpoint tests + 4 chat UI tests
 
 ### **🛑 Definition of Done**
 
 * [x] Chat UI with message bubbles
-* [ ] Follow-up queries maintain REPL state (TODO: implement in TaskService)
+* [x] Follow-up queries maintain REPL state
 * [x] Message history persisted
 
-### **📝 Notes**
+### **📝 Implementation Details**
 
-* Fixed Jinja2 RecursionError by moving `<script>` tag from component to parent template
-* All 139 tests passing (4 skipped)
-* REPL state persistence is placeholder - needs implementation in Phase 17
+**REPL Persistence Architecture:**
+- `TaskService._repl_storage`: Class-level dict mapping task_id → PythonREPL
+- `TaskService._storage_lock`: Threading lock for thread-safe access
+- `run_task(task_id=...)`: Stores REPL after task completion
+- `run_followup(task_id, query, config)`: Retrieves stored REPL, runs query, updates REPL
+- `has_repl_state(task_id)`: Check if REPL exists
+- `clear_repl_state(task_id)`: Manual cleanup
+
+**Chat Flow:**
+1. User completes task → REPL state stored with task_id
+2. Chat panel appears with message history from database
+3. User sends follow-up query → `POST /api/tasks/{task_id}/chat`
+4. Backend retrieves REPL, creates agent with existing state
+5. Agent executes query with full context (variables, imports, etc.)
+6. Response saved to database and returned to UI
+
+**Notes:**
+- Fixed Jinja2 RecursionError by moving `<script>` tag from component to parent template
+- All 144 tests passing (4 skipped)
+- REPL state is in-memory only (cleared on server restart)
+- Session required for chat (validates task's session_id)
 
 ---
 

@@ -149,6 +149,7 @@ async def run_task_async(
                 config_name=config_name,
                 context_path=Path(context_path) if context_path else None,
                 on_step=on_step,
+                task_id=task_id,  # Pass task_id for REPL persistence
             )
         )
 
