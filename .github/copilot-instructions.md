@@ -41,6 +41,7 @@ tests/        # Pytest suite (mirrors src structure)
 - **Error Handling**:
   - In REPL: Catch exceptions and return tracebacks as strings (don't crash).
   - In DSPy: Use `dspy.Assert` to retry on failure.
+- **Logging**: Use Python's `logging` module. No `print()` statements.
 
 ## ⚠️ Critical Implementation Details
 - **Phased Development**: Follow `AGILE_PLAN.md`. Do not implement features from future phases.

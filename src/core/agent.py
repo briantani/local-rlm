@@ -13,7 +13,7 @@ class RLMAgent:
     Orchestrates the Architect, Coder, and REPL to solve tasks.
     Supports recursive delegation handling.
     """
-    def __init__(self, max_steps: int = 10, max_depth: int = 3, depth: int = 0, root_dir: str | Path | None = None):
+    def __init__(self, max_steps: int = 10, max_depth: int = 3, depth: int = 0, root_dir: str | Path | None = None, coder=None):
         self.max_steps = max_steps
         self.max_depth = max_depth
         self.depth = depth
@@ -21,7 +21,7 @@ class RLMAgent:
 
         self.repl = PythonREPL()
         self.architect = Architect()
-        self.coder = Coder()
+        self.coder = coder if coder else Coder()
         self.responder = Responder()
         self.delegator = Delegator()
 

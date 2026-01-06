@@ -217,3 +217,31 @@ Methodology: Iterative Sprints. Strict ATest-Driven Development (TDD). Stack: Py
 *   [x] `compile_architect.py` runs successfully.
 *   [x] Agent loads optimized weights.
 *   [x] Infinite loop on file reading is resolved (Validated with `qwen2.5-coder`).
+
+## **🛠️ Phase 8: Enhanced Tooling & Retrieval**
+
+**Goal:** Equip the REPL with specialized libraries for complex document processing (Excel, PDF) and Web Search, enabling the Agent to handle real-world information retrieval tasks.
+
+### **📋 Implementation Steps**
+
+1.  **Dependency Updates:**
+    *   Add primary libraries: `openpyxl` (Excel), `pdfplumber` (PDF Tables), `chromadb` (Semantic Search), `duckduckgo-search` (Web).
+2.  **REPL Preloading (`src/core/repl.py`):**
+    *   Ensure these libraries are importable.
+    *   (Optional) Pre-import helper functions if simplifying usage is needed (e.g., a `search_web(query)` wrapper around DDGS).
+3.  **Search Module (`src/tools/search.py`):**
+    *   Implement a simple wrapper for `duckduckgo-search` to handle rate limits/errors gracefully.
+4.  **Coder Training:**
+    *   Update `src/modules/coder.py` few-shot examples to demonstrate using `pdfplumber` for tables and `openpyxl` for formulas.
+
+### **✅ Verification (Tests)**
+
+*   **Test 8.1 (Excel):** Given an .xlsx file with a formula, Agent must read the *formula* (using openpyxl), not just the value.
+*   **Test 8.2 (PDF Table):** Given a PDF with a table, Agent must extract it as a list of lists or DataFrame.
+*   **Test 8.3 (Web Search):** Agent "Who is the current president of France?" -> Uses DDGS -> Answers correctly.
+
+### **🛑 Definition of Done**
+
+*   [ ] REPL has access to `openpyxl`, `pdfplumber`, `chromadb`, `duckduckgo-search`.
+*   [ ] Agent can autonomously extract tables from PDFs.
+*   [ ] Agent can perform live web searches.

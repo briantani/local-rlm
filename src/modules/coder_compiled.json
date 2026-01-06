@@ -1,0 +1,49 @@
+{
+  "generate_code.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "task": "Read 'data.csv' and print the columns.",
+        "context_summary": "AVAILABLE FILES: [FILE] data.csv",
+        "expected_output": "Columns:"
+      },
+      {
+        "task": "Check the formula in cell E5 of 'dataset.xlsx'.",
+        "context_summary": "AVAILABLE FILES: [FILE] dataset.xlsx",
+        "reasoning": "To get the formula, I need to load the workbook with openpyxl WITHOUT data_only=True (default). Then I access the cell's .value property, which contains the formula string if it is a formula.",
+        "python_code": "import openpyxl\nwb = openpyxl.load_workbook('dataset.xlsx')\nprint(wb.active['E5'].value)",
+        "expected_output": "=SUM(A1:A5)"
+      }
+    ],
+    "signature": {
+      "instructions": "Generates Python code to solve a specific task.\nThe code should be a valid Python script that prints the final result to stdout.\nIMPORTANT:\n- To search the web, you MUST import `src.tools.search` and use `search_web(query)`.\n- Do NOT use `requests` or `BeautifulSoup` directly.",
+      "fields": [
+        {
+          "prefix": "Task:",
+          "description": "The task to solve using Python code."
+        },
+        {
+          "prefix": "Context Summary:",
+          "description": "Summary of previous context or variables available."
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Python Code:",
+          "description": "Executable Python code. Do not use markdown backticks. Prefer using installed tools like src.tools.search."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.0.4",
+      "cloudpickle": "3.1"
+    }
+  }
+}
