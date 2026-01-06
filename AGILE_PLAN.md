@@ -1263,11 +1263,22 @@ CREATE TABLE tasks (
 
 ### **🛑 Definition of Done**
 
-* [ ] FastAPI app with all endpoints
-* [ ] WebSocket streaming working
-* [ ] SQLite for task history
-* [ ] API keys handled securely (memory-only per session)
-* [ ] Integration tests passing
+* [x] FastAPI app with all endpoints
+* [x] WebSocket streaming working
+* [x] SQLite for task history
+* [x] API keys handled securely (memory-only per session)
+* [x] Integration tests passing (22 web tests, 106 total)
+
+**Implemented Files:**
+- `src/web/app.py` - FastAPI application factory with lifespan handler
+- `src/web/dependencies.py` - Dependency injection with service container
+- `src/web/database.py` - Async SQLite with aiosqlite for task persistence
+- `src/web/task_runner.py` - Async task execution with pub/sub streaming
+- `src/web/routes/sessions.py` - Session and API key endpoints
+- `src/web/routes/configs.py` - Configuration profile endpoints
+- `src/web/routes/tasks.py` - Task CRUD with background execution
+- `src/web/websocket/stream.py` - WebSocket endpoint for real-time updates
+- `tests/test_web.py` - Comprehensive test suite (22 tests)
 
 ---
 
