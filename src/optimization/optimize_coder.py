@@ -2,17 +2,18 @@ import dspy
 from src.config import get_lm
 from src.modules.coder import Coder
 from src.core.repl import PythonREPL
+from src.core.logger import logger
+from dspy.teleprompt import LabeledFewShot
 import os
-import shutil
 from pathlib import Path
 
 # 1. Configure LM
 try:
     lm = get_lm("ollama")
     dspy.settings.configure(lm=lm)
-    print("LM Configured:", lm.model)
+    logger.info(f"LM Configured: {lm.model}")
 except Exception as e:
-    print(f"Error configuring LM: {e}")
+    logger.error(f"Error configuring LM: {e}")
 
 # 2. Define Metric
 def validate_code_execution(example, prediction, trace=None):
@@ -48,7 +49,7 @@ def validate_code_execution(example, prediction, trace=None):
         if os.path.exists("data.csv"):
             os.remove("data.csv")
 
-print("Metric defined.")
+logger.info("Metric defined.")
 
 # 3. Create Training Set
 # We add examples that specifically teach the tricky parts (Excel formulas, Search).
@@ -69,21 +70,20 @@ trainset = [
     ).with_inputs("task", "context_summary")
 ]
 
-print(f"Created {len(trainset)} training examples.")
+logger.info(f"Created {len(trainset)} training examples.")
 
 # 4. Compile Coder
-from dspy.teleprompt import LabeledFewShot
 
 # Use LabeledFewShot to simply use our manual examples as demos
 teleprompter = LabeledFewShot(k=2)
 
-print("Compiling with LabeledFewShot...")
+logger.info("Compiling with LabeledFewShot...")
 coder_uncompiled = Coder()
 compiled_coder = teleprompter.compile(coder_uncompiled, trainset=trainset)
-print("Compilation finished.")
+logger.info("Compilation finished.")
 
 # 5. Save the Compiled Module
 project_root = Path(__file__).parent.parent.parent
 save_path = project_root / "src/modules/coder_compiled.json"
 compiled_coder.save(save_path)
-print(f"Saved compiled module to {save_path}")
+logger.info(f"Saved compiled module to {save_path}")

@@ -30,7 +30,7 @@ async def test_parallel_execution(setup_dspy_ollama):
     # Mocking standard run for test stability if LLM is unpredictable
     # We can't easily mock inner RLMAgent calls in integration test without patching
     # So we rely on prompts.
-    result = agent.run(task)
+    _ = agent.run(task)
     end_time = time.time()
 
     duration = end_time - start_time

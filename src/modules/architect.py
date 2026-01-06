@@ -1,6 +1,5 @@
 import dspy
 import os
-from typing import Literal
 
 class ArchitectSignature(dspy.Signature):
     """

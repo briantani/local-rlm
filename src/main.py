@@ -1,9 +1,9 @@
 import argparse
 import dspy
-import os
 from dotenv import load_dotenv
 from src.config import get_lm
 from src.core.agent import RLMAgent
+from src.core.logger import logger
 
 # Load environment variables
 load_dotenv()
@@ -20,24 +20,24 @@ def main():
     # 1. Configure the LLM
     try:
         model_display = args.model if args.model else "default"
-        print(f"Initializing LLM provider: {args.provider} (Model: {model_display})...")
+        logger.info(f"Initializing LLM provider: {args.provider} (Model: {model_display})...")
         lm = get_lm(args.provider, model_name=args.model)
         dspy.settings.configure(lm=lm)
     except Exception as e:
-        print(f"Failed to initialize LLM: {e}")
+        logger.error(f"Failed to initialize LLM: {e}")
         return
 
     # 2. Initialize Agent
     agent = RLMAgent(max_steps=5, root_dir=args.context)
 
     # 3. Run Task
-    print(f"Starting Agent with task: '{args.task}'")
+    logger.info(f"Starting Agent with task: '{args.task}'")
     result = agent.run(args.task)
 
-    print("\n" + "="*50)
-    print("FINAL RESULT:")
-    print(result)
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("FINAL RESULT:")
+    logger.info(result)
+    logger.info("="*50)
 
 if __name__ == "__main__":
     main()

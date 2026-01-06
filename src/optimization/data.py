@@ -1,5 +1,4 @@
 import dspy
-from src.modules.architect import Architect, ArchitectSignature
 
 def get_architect_data():
     """

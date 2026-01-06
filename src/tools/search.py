@@ -1,3 +1,4 @@
+from src.core.logger import logger
 from ddgs import DDGS
 
 def search_web(query: str, max_results: int = 5) -> list[dict[str, str]]:
@@ -18,14 +19,14 @@ def search_web(query: str, max_results: int = 5) -> list[dict[str, str]]:
             for r in ddgs.text(query, max_results=max_results):
                 results.append(r)
     except Exception as e:
-        print(f"Search API Error: {e}")
+        logger.error(f"Search API Error: {e}")
         return [{"error": str(e)}]
 
     return results
 
 if __name__ == "__main__":
     # Simple test
-    print("Searching for 'Python Programming'...")
+    logger.info("Searching for 'Python Programming'...")
     res = search_web("Python Programming", max_results=2)
     for item in res:
-        print(f"- {item.get('title')}: {item.get('href')}")
+        logger.info(f"- {item.get('title')}: {item.get('href')}")

@@ -1,6 +1,4 @@
 import pytest
-import os
-import shutil
 from pathlib import Path
 from src.core.agent import RLMAgent
 from src.tools.search import search_web

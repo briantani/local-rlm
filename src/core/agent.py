@@ -1,5 +1,6 @@
 import concurrent.futures
 from pathlib import Path
+from src.core.logger import logger
 from src.core.repl import PythonREPL
 from src.modules.architect import Architect
 from src.modules.coder import Coder
@@ -53,64 +54,65 @@ class RLMAgent:
         Executes the main loop to solve the task.
         """
         indent = "  " * self.depth
-        print(f"{indent}Agent (Depth {self.depth}) received task: {task}")
+        logger.info(f"{indent}Agent (Depth {self.depth}) received task: {task}")
 
         for step in range(self.max_steps):
-            print(f"\n{indent}--- Step {step + 1} ---")
+            logger.info(f"{indent}--- Step {step + 1} ---")
             context = self.format_context()
 
             # 1. Architect decides what to do
-            print(f"{indent}Thinking...")
+            logger.debug(f"{indent}Thinking...")
             try:
                 # We interpret 'data_desc' as the current context/state
                 decision = self.architect(query=task, data_desc=context)
                 action = decision.action.upper()
-                print(f"{indent}Architect Decision: {action}")
+                logger.info(f"{indent}Architect Decision: {action}")
             except Exception as e:
-                print(f"{indent}Architect error: {e}")
+                logger.error(f"{indent}Architect error: {e}")
                 action = "ANSWER"
 
             # 2. Execute Action
             if action == "ANSWER":
                 response = self.responder(query=task, context=context)
                 final_answer = response.response
-                print(f"{indent}Final Answer: {final_answer}")
+                logger.info(f"{indent}Final Answer: {final_answer}")
                 return final_answer
 
             elif action == "CODE":
-                print(f"{indent}Generating code...")
+                logger.info(f"{indent}Generating code...")
                 try:
                     code_pred = self.coder(task=task, context_summary=context)
                     code = code_pred.python_code
-                    # print(f"{indent}Code Generated:\n{code}")
+                    logger.debug(f"{indent}Code Generated:\n{code}")
 
-                    print(f"{indent}Executing code...")
+                    logger.info(f"{indent}Executing code...")
                     output = self.repl.execute(code)
-                    print(f"{indent}Execution Output (truncated): {output[:100]}..." if len(output) > 100 else f"{indent}Execution Output: {output}")
+                    log_msg = f"{indent}Execution Output (truncated): {output[:100]}..." if len(output) > 100 else f"{indent}Execution Output: {output}"
+                    logger.info(log_msg)
 
                     self.history.append((f"Executed Code:\n{code}", output))
 
                 except Exception as e:
                     error_msg = f"Error during coding/execution: {e}"
-                    print(f"{indent}{error_msg}")
+                    logger.error(f"{indent}{error_msg}")
                     self.history.append(("Attempted Code Generation", error_msg))
 
             elif action == "DELEGATE":
                 if self.depth >= self.max_depth:
-                    print(f"{indent}Max depth reached. Cannot delegate further. Returning to Answer mode.")
+                    logger.warning(f"{indent}Max depth reached. Cannot delegate further. Returning to Answer mode.")
                     # Force answer in next step or use responder now?
                     # Let's add instruction to history to guide Architect
                     self.history.append(("Action: DELEGATE", "FAILED: Max recursion saturation reached. You must solve this yourself using CODE or ANSWER."))
                     continue
 
-                print(f"{indent}Delegating task...")
+                logger.info(f"{indent}Delegating task...")
                 try:
                     # 1. Break down task
                     subtasks = self.delegator(task=task, context=context)
-                    print(f"{indent}Subtasks identified: {subtasks}")
+                    logger.info(f"{indent}Subtasks identified: {subtasks}")
 
                     if not subtasks:
-                        print(f"{indent}No subtasks found. Aborting delegation.")
+                        logger.warning(f"{indent}No subtasks found. Aborting delegation.")
                         self.history.append(("Action: DELEGATE", "FAILED: Could not split task."))
                         continue
 
@@ -134,15 +136,15 @@ class RLMAgent:
 
                     # 3. Aggregate results into history
                     combined_results = "\n".join(results)
-                    print(f"{indent}Delegation Complete. Results:\n{combined_results}")
+                    logger.info(f"{indent}Delegation Complete. Results:\n{combined_results}")
                     self.history.append((f"Delegated Subtasks: {subtasks}", f"Results from sub-agents:\n{combined_results}"))
 
                 except Exception as e:
-                    print(f"{indent}Delegation error: {e}")
+                    logger.error(f"{indent}Delegation error: {e}")
                     self.history.append(("Action: DELEGATE", f"Error: {e}"))
 
             else:
-                print(f"{indent}Unknown action: {action}")
+                logger.warning(f"{indent}Unknown action: {action}")
                 return f"Agent confused: Unknown action {action}"
 
         return "Max steps reached without definitive answer."

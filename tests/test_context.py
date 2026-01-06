@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 from src.core.explorer import scan_directory
 from src.config import get_lm
 import dspy

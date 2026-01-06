@@ -1,4 +1,3 @@
-import pytest
 from src.core.repl import PythonREPL
 
 def test_repl_persistence():
