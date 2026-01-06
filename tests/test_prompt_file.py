@@ -40,23 +40,28 @@ budget:
         "--config", str(config_file)
     ]
 
+    # Mock the TaskService.run_task method
     with patch.object(sys, "argv", test_args), \
-         patch("src.main.RLMAgent") as mock_agent_class, \
-         patch("src.main.get_lm_for_role") as mock_get_lm, \
-         patch("dspy.configure"):
+         patch("src.main.TaskService") as mock_task_service_class:
 
         # Setup mocks
-        mock_agent = MagicMock()
-        mock_agent.run.return_value = "Test result"
-        mock_agent_class.return_value = mock_agent
-        mock_get_lm.return_value = MagicMock()
+        mock_task_service = MagicMock()
+        mock_result = MagicMock()
+        mock_result.answer = "Test result"
+        mock_result.model_breakdown = {}
+        mock_result.total_cost = 0.0
+        mock_result.duration_seconds = 1.0
+        mock_result.step_count = 1
+        mock_task_service.run_task.return_value = mock_result
+        mock_task_service_class.return_value = mock_task_service
 
         # Run main
         main()
 
-        # Verify agent.run was called with the file content
-        mock_agent.run.assert_called_once()
-        actual_task = mock_agent.run.call_args[0][0]
+        # Verify run_task was called with the file content
+        mock_task_service.run_task.assert_called_once()
+        call_kwargs = mock_task_service.run_task.call_args
+        actual_task = call_kwargs.kwargs.get("task") or call_kwargs.args[0]
         assert actual_task == task_content.strip()
 
 

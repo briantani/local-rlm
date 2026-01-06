@@ -15,6 +15,16 @@ The agent operates in a **recursive decision loop**:
 4. **Responder** (`src/modules/responder.py`) formats final answers
 5. **Delegator** (`src/modules/delegator.py`) spawns parallel sub-agents for DELEGATE
 
+### Service Layer (Phase 12)
+
+The project uses a **service layer pattern** to share business logic between CLI and Web interfaces:
+
+- **`src/rlm/services/task_service.py`**: Orchestrates agent execution with callbacks for streaming
+- **`src/rlm/services/config_service.py`**: Loads, lists, and validates configuration profiles
+- **`src/rlm/services/session_service.py`**: Manages sessions with API keys (in-memory only, never persisted)
+
+**API Key Security**: API keys are stored only in session memory. They are NEVER persisted to disk or database.
+
 ### Critical Components
 
 - **`src/core/repl.py`**: Stateful Python sandbox. Variables MUST persist across `execute()` calls. Uses `exec()` with shared `globals`/`locals` dicts.
@@ -27,11 +37,14 @@ The agent operates in a **recursive decision loop**:
 
 ```text
 src/
+  rlm/        # Core library package (Phase 12+)
+    services/ # Service layer: TaskService, ConfigService, SessionService
   core/       # Infrastructure (REPL, Budget, Config, Agent orchestration)
   modules/    # DSPy Signatures and Modules (Architect, Coder, Responder, Delegator)
   optimization/  # DSPy compilation/optimization scripts (MIPROv2)
   tools/      # External capabilities (web search via DuckDuckGo)
   utils/      # Shared helpers
+  web/        # Web application (Phase 13+, coming soon)
 configs/      # YAML profiles (paper-gpt5.yaml, hybrid.yaml, local-only.yaml, etc.)
 tests/        # Pytest suite (mirrors src structure, uses conftest.py for mocks)
 ```
@@ -42,6 +55,8 @@ tests/        # Pytest suite (mirrors src structure, uses conftest.py for mocks)
 - **Package Manager**: `uv` (Astral's fast package manager)
 - **Framework**: `DSPy` (latest) - Chain-of-Thought, optimizer-based prompt tuning
 - **LLM Providers**: Gemini (via `google-generativeai`), OpenAI, Ollama (local)
+- **Web Stack**: FastAPI + HTMX + Alpine.js + Tailwind (Phase 13+)
+- **Persistence**: SQLite for task history (Phase 13+)
 - **Concurrency**: **ALWAYS** use `threading` or `ThreadPoolExecutor`. **NEVER** use `multiprocessing` (unnecessary in 3.14t).
 
 ## 🚀 Developer Workflow
@@ -54,6 +69,9 @@ uv run python src/main.py "Calculate fibonacci(100)" --config configs/paper-gpt5
 
 # With context (files in a directory)
 uv run python src/main.py "Summarize sales.csv" --config configs/hybrid.yaml --context ./data
+
+# With verbose task from file
+uv run python src/main.py --prompt-file tasks/research.txt --config configs/high-quality.yaml
 ```
 
 ### Configuration Profiles

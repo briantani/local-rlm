@@ -1,15 +1,22 @@
-import argparse
-from pathlib import Path
-import dspy
-from dotenv import load_dotenv
-from src.config import get_lm_for_role
-from src.core.agent import RLMAgent
-from src.core.budget import BudgetManager
-from src.core.config_loader import load_profile, ProfileConfig
-from src.core.logger import logger
+"""
+RLM Agent CLI Entry Point.
 
-# Load environment variables (for API keys only)
+This module provides the command-line interface for the RLM Agent.
+It uses the service layer (Phase 12) for all business logic.
+"""
+
+import argparse
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+from src.core.logger import logger
+from src.rlm.services import ConfigService, SessionService, TaskService
+
+# Load environment variables (for API keys)
 load_dotenv()
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -67,62 +74,84 @@ def main():
     else:
         task = args.task
 
-    # Load configuration profile
+    # Initialize services (Phase 12 pattern)
+    config_service = ConfigService()
+    session_service = SessionService()
+
+    # Create session and load API keys from environment
+    session = session_service.create_session()
+
+    # Load API keys from environment into session
+    if os.getenv("GEMINI_API_KEY"):
+        session.set_api_key("gemini", os.getenv("GEMINI_API_KEY"))
+    if os.getenv("OPENAI_API_KEY"):
+        session.set_api_key("openai", os.getenv("OPENAI_API_KEY"))
+    if os.getenv("ANTHROPIC_API_KEY"):
+        session.set_api_key("anthropic", os.getenv("ANTHROPIC_API_KEY"))
+
+    # Create task service with session
+    task_service = TaskService(config_service, session)
+
+    # Determine config name from path
+    config_name = str(args.config)
+
+    # Log configuration info
     try:
-        logger.info(f"Loading configuration profile: {args.config}")
-        config = load_profile(args.config)
-        logger.info(f"Profile loaded: {config.profile_name}")
-        if config.description:
-            logger.info(f"Description: {config.description}")
+        summary = config_service.get_profile_summary(args.config.stem)
+        if summary:
+            logger.info(f"Profile: {summary.name}")
+            if summary.description:
+                logger.info(f"Description: {summary.description}")
+            logger.info(f"Root model: {summary.root_provider}/{summary.root_model}")
+            logger.info(f"Delegate model: {summary.delegate_provider}/{summary.delegate_model}")
+            logger.info(f"Budget limit: ${summary.max_budget:.2f}")
+            logger.info(f"Max steps: {summary.max_steps}, Max depth: {summary.max_depth}")
+    except Exception as e:
+        logger.debug(f"Could not get profile summary: {e}")
 
-        # Initialize budget manager from config
-        BudgetManager._clear()  # Clear singleton for fresh start
-        budget_manager = BudgetManager(max_budget=config.budget.max_usd)
+    # Run task using service
+    try:
+        logger.info(f"Starting Agent with task: '{task[:100]}{'...' if len(task) > 100 else ''}'")
 
-        # Configure the root LM from profile
-        lm = get_lm_for_role("root", config, budget_manager=budget_manager)
-        dspy.settings.configure(lm=lm)
+        # Define step callback for logging
+        def on_step(step_info):
+            logger.debug(f"Step {step_info.step_number}: {step_info.action}")
 
-        logger.info(f"Root model: {config.root.provider}/{config.root.model}")
-        logger.info(f"Delegate model: {config.delegate.provider}/{config.delegate.model}")
-        logger.info(f"Budget limit: ${config.budget.max_usd:.2f}")
-        logger.info(f"Max steps: {config.root.max_steps}, Max depth: {config.root.max_depth}")
+        result = task_service.run_task(
+            task=task,
+            config_name=config_name,
+            context_path=args.context,
+            on_step=on_step,
+        )
+
+        # Print results
+        logger.info("\n" + "="*50)
+        logger.info("FINAL RESULT:")
+        logger.info(result.answer)
+        logger.info("="*50)
+
+        # Print cost breakdown
+        if result.model_breakdown:
+            logger.info("\n" + "-"*50)
+            logger.info("COST BREAKDOWN:")
+            for model_id, cost in result.model_breakdown.items():
+                logger.info(f"  {model_id}: ${cost:.4f}")
+            logger.info(f"  TOTAL: ${result.total_cost:.4f}")
+            logger.info(f"  Duration: {result.duration_seconds:.2f}s")
+            logger.info(f"  Steps: {result.step_count}")
+            logger.info("-"*50)
 
     except FileNotFoundError as e:
         logger.error(f"Config file not found: {e}")
-        logger.error(f"Available profiles in configs/: paper-gpt5.yaml, high-quality.yaml, cost-effective.yaml, hybrid.yaml, local-only.yaml")
+        logger.error("Available profiles in configs/: " +
+                    ", ".join(config_service.get_profile_names()))
+        return
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
         return
     except Exception as e:
-        logger.error(f"Failed to load config: {e}")
-        return
-
-    # Initialize Agent with config
-    agent = RLMAgent(
-        max_steps=config.root.max_steps,
-        max_depth=config.root.max_depth,
-        root_dir=args.context,
-        config=config,
-        budget_manager=budget_manager,
-    )
-
-    # Run Task
-    logger.info(f"Starting Agent with task: '{task[:100]}{'...' if len(task) > 100 else ''}'")
-    result = agent.run(task)
-
-    logger.info("\n" + "="*50)
-    logger.info("FINAL RESULT:")
-    logger.info(result)
-    logger.info("="*50)
-
-    # Print cost breakdown
-    breakdown = budget_manager.get_breakdown()
-    if breakdown:
-        logger.info("\n" + "-"*50)
-        logger.info("COST BREAKDOWN:")
-        for model_id, cost in breakdown.items():
-            logger.info(f"  {model_id}: ${cost:.4f}")
-        logger.info(f"  TOTAL: ${budget_manager.current_cost:.4f}")
-        logger.info("-"*50)
+        logger.error(f"Task execution failed: {e}")
+        raise
 
 if __name__ == "__main__":
     main()

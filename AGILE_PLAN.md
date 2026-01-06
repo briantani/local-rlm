@@ -873,4 +873,526 @@ budget:
 
 ---
 
-**🎯 Phase 11 Status: PROPOSED - AWAITING APPROVAL**
+**✅ Phase 11 Complete!** YAML configuration profiles with per-model pricing implemented.
+
+---
+
+## **🌐 Phase 12: Core Library Refactoring (Service Layer)**
+
+**Goal:** Extract business logic from `main.py` into reusable services that can be shared between CLI and Web interfaces. Establish clean separation of concerns.
+
+### **🏗️ Architecture Decision Record**
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **Frontend Framework** | HTMX + Alpine.js + Tailwind | Lightweight, server-driven, minimal JS complexity |
+| **Persistence** | SQLite | Simple, portable, single-file database |
+| **Authentication** | None (Phase 1) | Simplify initial implementation |
+| **API Key Storage** | Session-only (memory) | Security: never persist plain-text keys |
+
+### **📋 Implementation Steps**
+
+#### **12.1: Create Service Layer Package Structure**
+
+```
+src/
+├── rlm/                     # NEW: Core library (importable package)
+│   ├── __init__.py
+│   └── services/
+│       ├── __init__.py
+│       ├── task_service.py  # Agent orchestration
+│       ├── config_service.py # Profile management
+│       └── session_service.py # Session + API keys
+├── cli/                     # NEW: CLI entrypoint
+│   └── main.py              # Thin wrapper around services
+├── web/                     # NEW: Web application (Phase 13+)
+│   └── ...
+└── main.py → cli/main.py    # Backward compat symlink/redirect
+```
+
+#### **12.2: TaskService (`src/rlm/services/task_service.py`)**
+
+```python
+from dataclasses import dataclass
+from pathlib import Path
+
+@dataclass
+class TaskResult:
+    """Result of a task execution."""
+    answer: str
+    execution_history: list[dict]  # Steps taken
+    total_cost: float
+    model_breakdown: dict[str, float]
+
+class TaskService:
+    """Orchestrates agent execution, shared by CLI and Web."""
+
+    def __init__(self, config_service: ConfigService, session: SessionService):
+        self.config_service = config_service
+        self.session = session
+
+    def run_task(
+        self,
+        task: str,
+        config_name: str,
+        context_path: Path | None = None,
+        on_step: Callable[[dict], None] | None = None,  # Streaming callback
+    ) -> TaskResult:
+        """Execute a task with the RLM agent.
+
+        Args:
+            task: The task/query to execute
+            config_name: Name of config profile (e.g., "cost-effective")
+            context_path: Optional directory for file context
+            on_step: Callback for streaming progress updates
+
+        Returns:
+            TaskResult with answer, history, and cost breakdown
+        """
+        # Load config with session's API keys
+        config = self.config_service.load_with_keys(
+            config_name,
+            self.session.api_keys
+        )
+
+        # Create agent (existing logic from main.py)
+        agent = RLMAgent(config=config, ...)
+
+        # Execute with step callbacks
+        result = agent.run(task, context_path, on_step=on_step)
+
+        return TaskResult(
+            answer=result.answer,
+            execution_history=result.history,
+            total_cost=agent.budget.current_cost,
+            model_breakdown=agent.budget.get_breakdown()
+        )
+```
+
+#### **12.3: ConfigService (`src/rlm/services/config_service.py`)**
+
+```python
+class ConfigService:
+    """Manages configuration profiles."""
+
+    def __init__(self, configs_dir: Path = Path("configs")):
+        self.configs_dir = configs_dir
+
+    def list_profiles(self) -> list[ProfileSummary]:
+        """List all available config profiles with metadata."""
+        profiles = []
+        for yaml_file in self.configs_dir.glob("*.yaml"):
+            config = self._load_yaml(yaml_file)
+            profiles.append(ProfileSummary(
+                name=yaml_file.stem,
+                description=config.get("description", ""),
+                root_model=config["root"]["model"],
+                max_budget=config["budget"]["max_usd"]
+            ))
+        return profiles
+
+    def load_profile(self, name: str) -> ProfileConfig:
+        """Load a profile by name."""
+        return load_profile(self.configs_dir / f"{name}.yaml")
+
+    def load_with_keys(
+        self,
+        name: str,
+        api_keys: dict[str, str]
+    ) -> ProfileConfig:
+        """Load profile and inject runtime API keys."""
+        config = self.load_profile(name)
+        # Inject keys without persisting
+        config.api_keys = api_keys
+        return config
+
+    def validate_profile(self, name: str) -> list[str]:
+        """Validate a profile, return list of issues."""
+        # Check required fields, model availability, etc.
+```
+
+#### **12.4: SessionService (`src/rlm/services/session_service.py`)**
+
+```python
+import secrets
+from dataclasses import dataclass, field
+
+@dataclass
+class Session:
+    """In-memory session with API keys (never persisted)."""
+    session_id: str = field(default_factory=lambda: secrets.token_urlsafe(16))
+    api_keys: dict[str, str] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=datetime.now)
+
+    def set_api_key(self, provider: str, key: str) -> None:
+        """Set an API key for a provider."""
+        self.api_keys[provider] = key
+
+    def get_api_key(self, provider: str) -> str | None:
+        """Get an API key for a provider."""
+        return self.api_keys.get(provider)
+
+    def has_required_keys(self, providers: list[str]) -> tuple[bool, list[str]]:
+        """Check if session has all required API keys."""
+        missing = [p for p in providers if p not in self.api_keys]
+        return len(missing) == 0, missing
+
+class SessionService:
+    """Manages sessions in memory (no persistence)."""
+
+    def __init__(self):
+        self._sessions: dict[str, Session] = {}
+
+    def create_session(self) -> Session:
+        """Create a new session."""
+        session = Session()
+        self._sessions[session.session_id] = session
+        return session
+
+    def get_session(self, session_id: str) -> Session | None:
+        """Retrieve a session by ID."""
+        return self._sessions.get(session_id)
+
+    def set_api_key(self, session_id: str, provider: str, key: str) -> bool:
+        """Set an API key for a session."""
+        session = self.get_session(session_id)
+        if session:
+            session.set_api_key(provider, key)
+            return True
+        return False
+```
+
+#### **12.5: Refactor CLI (`src/cli/main.py`)**
+
+Thin wrapper that uses services:
+
+```python
+def main():
+    parser = argparse.ArgumentParser(...)
+    args = parser.parse_args()
+
+    # Initialize services
+    config_service = ConfigService()
+    session_service = SessionService()
+
+    # Create session with env-based API keys
+    session = session_service.create_session()
+    if os.getenv("GEMINI_API_KEY"):
+        session.set_api_key("gemini", os.getenv("GEMINI_API_KEY"))
+    if os.getenv("OPENAI_API_KEY"):
+        session.set_api_key("openai", os.getenv("OPENAI_API_KEY"))
+
+    # Run task via service
+    task_service = TaskService(config_service, session)
+    result = task_service.run_task(
+        task=args.task,
+        config_name=args.config.stem,
+        context_path=args.context,
+        on_step=lambda step: logger.info(f"Step: {step}")
+    )
+
+    print(result.answer)
+```
+
+### **✅ Verification (Tests)**
+
+**Test 12.1: TaskService basic execution**
+
+```python
+def test_task_service_runs_task():
+    config_svc = ConfigService()
+    session_svc = SessionService()
+    session = session_svc.create_session()
+    session.set_api_key("gemini", "test-key")
+
+    task_svc = TaskService(config_svc, session)
+    result = task_svc.run_task("What is 2+2?", "cost-effective")
+
+    assert "4" in result.answer
+```
+
+**Test 12.2: SessionService API key management**
+
+```python
+def test_session_api_key_not_persisted():
+    session_svc = SessionService()
+    session = session_svc.create_session()
+    session.set_api_key("openai", "sk-secret-key")
+
+    # Key exists in memory
+    assert session.get_api_key("openai") == "sk-secret-key"
+
+    # New service instance has no keys
+    new_svc = SessionService()
+    assert new_svc.get_session(session.session_id) is None
+```
+
+**Test 12.3: ConfigService lists profiles**
+
+```python
+def test_config_service_lists_profiles():
+    config_svc = ConfigService()
+    profiles = config_svc.list_profiles()
+
+    names = [p.name for p in profiles]
+    assert "cost-effective" in names
+    assert "high-quality" in names
+```
+
+**Test 12.4: CLI backward compatibility**
+
+```python
+def test_cli_still_works():
+    result = subprocess.run(
+        ["uv", "run", "python", "src/main.py", "What is 2+2?",
+         "--config", "configs/cost-effective.yaml"],
+        capture_output=True, text=True
+    )
+    assert result.returncode == 0
+```
+
+### **🛑 Definition of Done**
+
+* [x] `src/rlm/` package structure created
+* [x] `TaskService` extracts agent logic from main.py
+* [x] `ConfigService` handles profile loading/listing
+* [x] `SessionService` manages in-memory API keys
+* [x] CLI refactored to use services
+* [x] All existing tests still pass (84 passed, 6 skipped)
+* [x] New service tests added and passing (32 tests)
+
+---
+
+**✅ Phase 12 Complete!** Service layer implemented and verified.
+
+---
+
+### **⏱️ Estimated Effort**
+
+| Task | Effort |
+|------|--------|
+| 12.1 Package structure | 0.5h |
+| 12.2 TaskService | 2h |
+| 12.3 ConfigService | 1h |
+| 12.4 SessionService | 1h |
+| 12.5 CLI refactor | 1.5h |
+| Testing | 2h |
+| **Total** | **8h** |
+
+---
+
+## **🚀 Phase 13: FastAPI Backend with WebSocket Streaming**
+
+**Goal:** Create a FastAPI backend that exposes the service layer via REST and WebSocket APIs for real-time streaming.
+
+### **📋 Implementation Steps**
+
+#### **13.1: FastAPI Application Structure**
+
+```
+src/web/
+├── __init__.py
+├── app.py              # FastAPI application factory
+├── dependencies.py     # Dependency injection
+├── routes/
+│   ├── __init__.py
+│   ├── tasks.py        # POST /tasks, GET /tasks/{id}
+│   ├── configs.py      # GET /configs, GET /configs/{name}
+│   └── sessions.py     # POST /sessions, PUT /sessions/{id}/keys
+└── websocket/
+    └── stream.py       # WebSocket endpoint for real-time updates
+```
+
+#### **13.2: Core Endpoints**
+
+**Sessions:**
+
+* `POST /api/sessions` → Create session, return session_id
+* `PUT /api/sessions/{id}/keys` → Set API keys (in request body, not persisted)
+* `GET /api/sessions/{id}/keys/status` → Check which keys are configured
+
+**Configs:**
+
+* `GET /api/configs` → List all profiles with metadata
+* `GET /api/configs/{name}` → Get profile details (sans sensitive info)
+
+**Tasks:**
+
+* `POST /api/tasks` → Start a task, return task_id
+* `GET /api/tasks/{id}` → Get task status/result
+* `WebSocket /ws/tasks/{id}` → Stream real-time step updates
+
+#### **13.3: WebSocket Streaming**
+
+```python
+@router.websocket("/ws/tasks/{task_id}")
+async def task_stream(websocket: WebSocket, task_id: str):
+    await websocket.accept()
+
+    # Subscribe to task updates
+    async for update in task_runner.subscribe(task_id):
+        await websocket.send_json({
+            "type": update.type,  # "step", "code", "output", "complete"
+            "data": update.data
+        })
+```
+
+#### **13.4: SQLite Persistence for Task History**
+
+```python
+# Database schema
+CREATE TABLE tasks (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    task_text TEXT NOT NULL,
+    config_name TEXT NOT NULL,
+    status TEXT NOT NULL,  -- pending, running, completed, failed
+    result TEXT,           -- JSON: answer, history, cost
+    created_at TIMESTAMP,
+    completed_at TIMESTAMP
+);
+
+# Note: API keys are NEVER stored in database
+```
+
+### **✅ Verification (Tests)**
+
+* Test REST endpoints with pytest + httpx
+* Test WebSocket streaming with pytest-asyncio
+* Test session isolation (one session can't access another's tasks)
+
+### **🛑 Definition of Done**
+
+* [ ] FastAPI app with all endpoints
+* [ ] WebSocket streaming working
+* [ ] SQLite for task history
+* [ ] API keys handled securely (memory-only per session)
+* [ ] Integration tests passing
+
+---
+
+## **🎨 Phase 14: Minimal HTMX + Alpine.js UI**
+
+**Goal:** Create a minimal but functional web UI for running tasks and viewing results.
+
+### **📋 Implementation Steps**
+
+#### **14.1: UI Structure**
+
+```
+src/web/
+├── templates/
+│   ├── base.html         # Tailwind + HTMX + Alpine setup
+│   ├── index.html         # Main page
+│   ├── partials/
+│   │   ├── task_form.html
+│   │   ├── task_result.html
+│   │   └── step_card.html
+│   └── components/
+│       ├── api_key_modal.html
+│       └── config_selector.html
+└── static/
+    └── css/
+        └── app.css       # Tailwind (via CDN or build)
+```
+
+#### **14.2: Core Views**
+
+1. **Home Page**: Task input, config selector, run button
+2. **Execution View**: Real-time streaming of steps via WebSocket + HTMX
+3. **Result View**: Final answer, execution history, cost breakdown
+
+#### **14.3: API Key Modal**
+
+* Modal triggered when user selects a config requiring API keys
+* Keys entered are sent to `PUT /api/sessions/{id}/keys`
+* Stored in session (memory only), cleared on browser close
+* Visual indicator showing which keys are configured
+
+### **🛑 Definition of Done**
+
+* [ ] Home page with task input
+* [ ] Config selector dropdown
+* [ ] API key configuration modal
+* [ ] Real-time execution streaming
+* [ ] Result display with cost breakdown
+
+---
+
+## **⚙️ Phase 15: Configuration Management UI**
+
+**Goal:** Allow users to view, compare, and understand configuration profiles.
+
+### **📋 Implementation Steps**
+
+1. **Config List View**: Cards showing all profiles with key info
+2. **Config Detail View**: Full YAML viewer with syntax highlighting
+3. **Model Comparison**: Side-by-side comparison of 2 profiles
+4. **Cost Estimator**: Given a task size, estimate cost per profile
+
+### **🛑 Definition of Done**
+
+* [ ] Profile list with filtering
+* [ ] Detail view with YAML display
+* [ ] Cost estimator widget
+
+---
+
+## **💬 Phase 16: Chat Interface for Follow-up Queries**
+
+**Goal:** Allow users to continue querying a completed task, maintaining context.
+
+### **📋 Implementation Steps**
+
+1. **Chat Panel**: Appears after task completion
+2. **Context Persistence**: REPL state preserved for follow-ups
+3. **Message History**: Stored in SQLite per task
+4. **Code Re-execution**: User can ask to modify/re-run code
+
+### **🛑 Definition of Done**
+
+* [ ] Chat UI with message bubbles
+* [ ] Follow-up queries maintain REPL state
+* [ ] Message history persisted
+
+---
+
+## **🖼️ Phase 17: Canvas & Export Features**
+
+**Goal:** Allow users to save, share, and export task results.
+
+### **📋 Implementation Steps**
+
+1. **Canvas View**: Rich display of final answer with code blocks
+2. **Export Options**: Markdown, PDF, JSON
+3. **Share Link**: Generate shareable (read-only) link to result
+4. **Task Templates**: Save successful tasks as reusable templates
+
+### **🛑 Definition of Done**
+
+* [ ] Canvas view with formatted output
+* [ ] Export to Markdown/PDF
+* [ ] Shareable links
+
+---
+
+## **✨ Phase 18: Polish & Production Readiness**
+
+**Goal:** Production hardening, documentation, and UX polish.
+
+### **📋 Implementation Steps**
+
+1. **Error Handling**: User-friendly error messages
+2. **Loading States**: Proper spinners, skeleton screens
+3. **Mobile Responsiveness**: Tailwind responsive classes
+4. **Documentation**: User guide, API docs (OpenAPI)
+5. **Dockerfile**: Container for easy deployment
+6. **Rate Limiting**: Basic protection against abuse
+
+### **🛑 Definition of Done**
+
+* [ ] No unhandled errors visible to users
+* [ ] Mobile-friendly UI
+* [ ] API documentation generated
+* [ ] Docker deployment working
+* [ ] README updated with web app instructions
