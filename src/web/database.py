@@ -29,6 +29,12 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
 
 
+class MessageRole(str, Enum):
+    """Chat message role."""
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
 @dataclass
 class TaskRecord:
     """Database record for a task."""
@@ -55,6 +61,26 @@ class TaskRecord:
         }
 
 
+@dataclass
+class ChatMessage:
+    """Database record for a chat message."""
+    id: int
+    task_id: str
+    role: MessageRole
+    content: str
+    timestamp: datetime
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "task_id": self.task_id,
+            "role": self.role.value,
+            "content": self.content,
+            "timestamp": self.timestamp.isoformat(),
+        }
+
+
 async def init_db():
     """Initialize the database with required tables."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -77,6 +103,24 @@ async def init_db():
         await db.execute("""
             CREATE INDEX IF NOT EXISTS idx_tasks_session
             ON tasks(session_id)
+        """)
+
+        # Chat messages table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            )
+        """)
+
+        # Index for task chat queries
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_chat_task
+            ON chat_messages(task_id, timestamp)
         """)
 
         await db.commit()
@@ -221,3 +265,84 @@ def _row_to_record(row: aiosqlite.Row) -> TaskRecord:
         created_at=datetime.fromisoformat(row["created_at"]),
         completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
     )
+
+
+# =============================================================================
+# Chat Message Operations
+# =============================================================================
+
+
+async def create_chat_message(
+    task_id: str,
+    role: MessageRole,
+    content: str,
+) -> ChatMessage:
+    """
+    Create a new chat message.
+
+    Args:
+        task_id: Task identifier
+        role: Message role (user/assistant)
+        content: Message content
+
+    Returns:
+        Created ChatMessage
+    """
+    now = datetime.now()
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+            INSERT INTO chat_messages (task_id, role, content, timestamp)
+            VALUES (?, ?, ?, ?)
+            """,
+            (task_id, role.value, content, now.isoformat()),
+        )
+        message_id = cursor.lastrowid
+        await db.commit()
+
+    return ChatMessage(
+        id=message_id,
+        task_id=task_id,
+        role=role,
+        content=content,
+        timestamp=now,
+    )
+
+
+async def get_chat_messages(task_id: str) -> list[ChatMessage]:
+    """
+    Get all chat messages for a task.
+
+    Args:
+        task_id: Task identifier
+
+    Returns:
+        List of ChatMessages, ordered by timestamp
+    """
+    messages = []
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """
+            SELECT * FROM chat_messages
+            WHERE task_id = ?
+            ORDER BY timestamp ASC
+            """,
+            (task_id,),
+        ) as cursor:
+            async for row in cursor:
+                messages.append(_row_to_chat_message(row))
+    return messages
+
+
+def _row_to_chat_message(row: aiosqlite.Row) -> ChatMessage:
+    """Convert a database row to ChatMessage."""
+    return ChatMessage(
+        id=row["id"],
+        task_id=row["task_id"],
+        role=MessageRole(row["role"]),
+        content=row["content"],
+        timestamp=datetime.fromisoformat(row["timestamp"]),
+    )
+

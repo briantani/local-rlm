@@ -15,11 +15,14 @@ from fastapi.testclient import TestClient
 from src.web.app import create_app
 from src.web.database import (
     TaskStatus,
+    MessageRole,
     init_db,
     create_task,
     get_task,
     get_tasks_for_session,
     update_task_status,
+    create_chat_message,
+    get_chat_messages,
 )
 
 
@@ -376,6 +379,80 @@ class TestDatabase:
         assert "task-a" in task_ids
         assert "task-b" in task_ids
         assert "task-c" not in task_ids
+
+
+# =============================================================================
+# Chat Tests (Phase 16)
+# =============================================================================
+
+
+class TestChatEndpoints:
+    """Tests for chat API endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_create_chat_message(self, test_db):
+        """Test creating a chat message."""
+        # Create a task first
+        task = await create_task("chat-task-1", "session-1", "Test task", "config")
+
+        # Create chat messages
+        user_msg = await create_chat_message(
+            task_id=task.id,
+            role=MessageRole.USER,
+            content="What is the result?"
+        )
+
+        assert user_msg.id is not None
+        assert user_msg.task_id == task.id
+        assert user_msg.role == MessageRole.USER
+        assert user_msg.content == "What is the result?"
+
+        assistant_msg = await create_chat_message(
+            task_id=task.id,
+            role=MessageRole.ASSISTANT,
+            content="The result is 42."
+        )
+
+        assert assistant_msg.id is not None
+        assert assistant_msg.role == MessageRole.ASSISTANT
+
+    @pytest.mark.asyncio
+    async def test_get_chat_messages(self, test_db):
+        """Test retrieving chat history."""
+        # Create a task
+        task = await create_task("chat-task-2", "session-2", "Test task", "config")
+
+        # Create multiple messages
+        await create_chat_message(task.id, MessageRole.USER, "Question 1")
+        await create_chat_message(task.id, MessageRole.ASSISTANT, "Answer 1")
+        await create_chat_message(task.id, MessageRole.USER, "Question 2")
+
+        # Retrieve messages
+        messages = await get_chat_messages(task.id)
+
+        assert len(messages) == 3
+        assert messages[0].role == MessageRole.USER
+        assert messages[1].role == MessageRole.ASSISTANT
+        assert messages[2].role == MessageRole.USER
+
+    def test_get_chat_history_endpoint(self, client, session_id):
+        """Test GET /api/tasks/{task_id}/chat endpoint."""
+        # This will return 404 since we don't have a real completed task
+        # But it validates the route exists
+        response = client.get("/api/tasks/fake-task-id/chat")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Task not found"
+
+    def test_send_chat_message_endpoint_requires_task(self, client):
+        """Test POST /api/tasks/{task_id}/chat requires valid task."""
+        response = client.post(
+            "/api/tasks/nonexistent-task/chat",
+            json={"message": "Hello"}
+        )
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
 
 
 # =============================================================================

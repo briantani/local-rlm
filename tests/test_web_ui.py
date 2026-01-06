@@ -390,3 +390,46 @@ class TestJavaScriptIntegration:
         assert response.status_code == 200
         # Should have code to extract profiles from response
         assert b"profiles" in response.content.lower()
+
+# =============================================================================
+# Chat Interface Tests (Phase 16)
+# =============================================================================
+
+
+class TestChatInterface:
+    """Test chat interface for follow-up queries."""
+
+    def test_chat_panel_component_exists(self, client):
+        """Test that chat panel component file exists."""
+        from pathlib import Path
+
+        chat_panel_path = Path("src/web/templates/components/chat_panel.html")
+        assert chat_panel_path.exists(), "Chat panel component should exist"
+
+    def test_home_page_includes_chat_panel(self, client):
+        """Test that home page includes chat panel component."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        # Should reference chat panel (either directly or via include)
+        # The actual chat panel is conditionally shown via x-show
+        assert b"chat" in response.content.lower() or b"components/chat_panel" in response.content
+
+    def test_chat_panel_has_alpine_js_integration(self, client):
+        """Test that chat panel uses Alpine.js."""
+        from pathlib import Path
+
+        chat_panel_path = Path("src/web/templates/components/chat_panel.html")
+        content = chat_panel_path.read_text()
+
+        # Should have Alpine.js directives
+        assert "x-data" in content or "x-show" in content
+        assert "chatPanel" in content  # Alpine component function
+
+    def test_home_has_current_task_id_for_chat(self, client):
+        """Test that home page tracks currentTaskId for chat integration."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        # Should have currentTaskId in Alpine state
+        assert b"currentTaskId" in response.content

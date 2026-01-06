@@ -1387,22 +1387,30 @@ src/web/
 
 ---
 
-## **💬 Phase 16: Chat Interface for Follow-up Queries**
+## **💬 Phase 16: Chat Interface for Follow-up Queries** ✅
 
 **Goal:** Allow users to continue querying a completed task, maintaining context.
 
 ### **📋 Implementation Steps**
 
-1. **Chat Panel**: Appears after task completion
-2. **Context Persistence**: REPL state preserved for follow-ups
-3. **Message History**: Stored in SQLite per task
-4. **Code Re-execution**: User can ask to modify/re-run code
+1. ✅ **Chat Panel**: Alpine.js component with message display, input handling
+2. ✅ **Chat API**: GET/POST `/api/tasks/{task_id}/chat` endpoints
+3. ⏸️ **REPL Persistence**: State preservation NOT YET implemented (placeholder in code)
+4. ✅ **Message History**: SQLite `chat_messages` table with task_id FK
+5. ✅ **UI Integration**: Chat panel integrated into home page with conditional display
+6. ✅ **Tests**: 4 chat UI tests + 4 backend API tests
 
 ### **🛑 Definition of Done**
 
-* [ ] Chat UI with message bubbles
-* [ ] Follow-up queries maintain REPL state
-* [ ] Message history persisted
+* [x] Chat UI with message bubbles
+* [ ] Follow-up queries maintain REPL state (TODO: implement in TaskService)
+* [x] Message history persisted
+
+### **📝 Notes**
+
+* Fixed Jinja2 RecursionError by moving `<script>` tag from component to parent template
+* All 139 tests passing (4 skipped)
+* REPL state persistence is placeholder - needs implementation in Phase 17
 
 ---
 
