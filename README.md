@@ -75,9 +75,16 @@ uv sync
 
 ## Configuration
 
-The agent uses **YAML configuration profiles** for all settings. This
-provides a clean, version-controllable way to manage different use cases
-(cost-effective, high-quality, local-only, etc.).
+The agent uses **YAML configuration profiles** for all settings. See
+**[Configuration Profiles Guide →](configs/README.md)** for complete
+documentation on:
+
+- Available profiles and when to use them
+- Model pricing and selection strategies
+- Creating custom configurations
+- Budget management and optimization
+
+### Quick Start Configuration
 
 ### Step 1: Set Up API Keys (Optional)
 
@@ -102,15 +109,22 @@ echo "OPENAI_API_KEY=your-key-here" | Out-File -FilePath .env `
 
 ### Step 2: Choose a Configuration Profile
 
-The `configs/` directory contains pre-configured profiles:
+The `configs/` directory contains pre-configured profiles. See
+[configs/README.md](configs/README.md) for detailed descriptions and
+performance comparisons.
 
-| Profile | Description | Best For |
-| ------- | ----------- | -------- |
-| **`local-only.yaml`** | Free Ollama models only | Privacy, offline, no costs |
-| **`cost-effective.yaml`** | Gemini 2.5 Flash | Low-cost cloud tasks |
-| **`paper-gpt5.yaml`** | GPT-5 (root) + GPT-5-mini | Replicate paper |
-| **`high-quality.yaml`** | GPT-5.2 flagship | Maximum capability |
-| **`hybrid.yaml`** | Ollama + Gemini | Best of both worlds |
+**Quick Reference:**
+
+| Profile | Best For | Cost |
+| ------- | -------- | ---- |
+| **`paper-gpt5.yaml`** | Research replication | ~$5/task |
+| **`high-quality.yaml`** | Maximum capability | ~$5/task |
+| **`cost-effective.yaml`** | Budget-friendly | ~$0.50/task |
+| **`local-only.yaml`** | Privacy, offline, free | $0 |
+| **`hybrid.yaml`** | Production apps | ~$2/task |
+
+For full details on each profile, model pricing, and selection strategies, see
+**[Configuration Profiles Guide →](configs/README.md)**
 
 ### Step 3: Run the Agent
 
@@ -173,133 +187,54 @@ uv run python src/main.py "<your task>" --config configs/<profile>.yaml
 
 ## Understanding Configuration Profiles
 
-### Profile Structure
+For detailed information on configuration profiles, see the
+**[Configuration Profiles Guide →](configs/README.md)**.
 
-Each YAML profile defines:
+### Quick Reference
+
+**Basic Profile Structure:**
 
 ```yaml
-profile_name: "Cost-Effective Profile"
-description: "Optimized for low cost using Gemini 2.5 Flash"
-
-# Root agent configuration
+# Root agent (main orchestrator)
 root:
-  provider: gemini
-  model: gemini-2.5-flash
+  provider: gemini | openai | ollama
+  model: model-name
   max_steps: 10
   max_depth: 3
-  pricing:
-    input_per_1m: 0.30   # $0.30 per 1M input tokens
-    output_per_1m: 2.50  # $2.50 per 1M output tokens
 
-# Sub-agent (delegate) configuration
+# Sub-agents (for parallel delegation)
 delegate:
   provider: gemini
-  model: gemini-2.5-flash-lite
+  model: cheaper-model
   max_steps: 5
   max_depth: 0
-  pricing:
-    input_per_1m: 0.10
-    output_per_1m: 0.40
 
-# Global budget limit (sum of all model costs)
+# Budget control
 budget:
   max_usd: 0.50
 ```
 
-### Key Concepts
+**Key Concepts:**
 
-**Root vs. Delegate:**
+- **Root**: Main agent receiving your task
+- **Delegate**: Sub-agents for parallel task decomposition
+- **max_steps**: Prevents infinite CODE → EXECUTE loops
+- **max_depth**: Limits delegation recursion
 
-- **Root**: The main agent that receives your task
-- **Delegate**: Sub-agents spawned for parallel task decomposition
-- Using a cheaper/faster model for delegates reduces costs
-
-**Per-Model Pricing:**
-
-- Each model tracks its own token usage and costs
-- The `budget.max_usd` limit applies to the **sum** of all model costs
-- Cost breakdown is printed at the end of each run
-
-**Max Steps & Depth:**
-
-- `max_steps`: Prevents infinite CODE → EXECUTE loops
-- `max_depth`: Limits delegation recursion (prevents exponential sub-agent
-  spawning)
-
-### Creating Custom Profiles
-
-1. **Copy an existing profile:**
-
-   ```bash
-   cp configs/cost-effective.yaml configs/my-profile.yaml
-   ```
-
-2. **Edit the YAML file** to customize:
-
-   - Models (see available models below)
-   - Budget limits
-   - Max steps/depth
-   - Per-module overrides (optional)
-
-3. **Run with your profile:**
-
-   ```bash
-   uv run python src/main.py "your task" --config configs/my-profile.yaml
-   ```
-
-### Available Models (January 2026)
-
-**OpenAI:**
-
-- `gpt-5.2` - Flagship model ($1.75/$14.00 per 1M tokens)
-- `gpt-5` - Paper root model ($1.25/$10.00)
-- `gpt-5-mini` - Paper delegate model ($0.25/$2.00)
-- `gpt-5-nano` - Ultra cost-effective ($0.05/$0.40)
-
-**Google Gemini:**
-
-- `gemini-3-pro` - Preview, most capable ($2.00/$12.00)
-- `gemini-3-flash` - Preview, fast + intelligent ($0.50/$3.00)
-- `gemini-2.5-flash` - Stable, best value ($0.30/$2.50)
-- `gemini-2.5-flash-lite` - Ultra low cost ($0.10/$0.40)
-
-**Ollama (Local, Free):**
-
-- `qwen2.5-coder:14b` - Best for coding
-- `qwen2.5-coder:7b` - Faster, lower memory
-- `llama3:8b` - General purpose
+For complete documentation including model pricing, selection strategies,
+and performance comparisons, see
+**[Configuration Profiles Guide →](configs/README.md)**.
 
 ---
 
-## Advanced Configuration
+## Advanced Features
 
 ### Per-Module Model Overrides
 
-You can specify different models for each DSPy module:
-
-```yaml
-# In your custom profile
-modules:
-  architect:
-    provider: gemini
-    model: gemini-3-flash
-    pricing:
-      input_per_1m: 0.50
-      output_per_1m: 3.00
-
-  coder:
-    provider: ollama
-    model: qwen2.5-coder:7b
-    pricing:
-      input_per_1m: 0.0  # Local = free
-      output_per_1m: 0.0
-```
-
-This is useful for:
-
-- Using local models for code generation (fast, free)
-- Using cloud models for decision-making (better reasoning)
-- See `configs/hybrid.yaml` for a working example
+You can specify different models for each DSPy module (Architect, Coder,
+Responder, Delegator). See the
+**[Configuration Guide →](configs/README.md#-configuration-anatomy)** for
+details and examples like `configs/hybrid.yaml`.
 
 ### Handling Large Files
 
