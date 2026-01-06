@@ -327,22 +327,33 @@ for todo in todos:
 ### Basic Syntax
 
 ```bash
+# Short tasks: Use inline string
 uv run python src/main.py "<your task>" --config <profile.yaml> [--context <path>]
+
+# Long/complex tasks: Use prompt file
+uv run python src/main.py --prompt-file <task.txt> --config <profile.yaml> [--context <path>]
 ```
 
 ### Arguments
 
 | Argument | Description | Required |
 | -------- | ----------- | -------- |
-| `task` | The natural language task to perform | Yes |
+| `task` | The natural language task to perform (inline) | Yes* |
+| `--prompt-file` | Path to text file with task description (for verbose prompts) | Yes* |
 | `--config` | Path to YAML configuration file | Yes |
 | `--context` | Path to a directory with files to include | No |
+
+*Either `task` or `--prompt-file` must be provided (mutually exclusive)
 
 ### Examples
 
 ```bash
 # Simple math with local model
 uv run python src/main.py "What is 2^100?" --config configs/local-only.yaml
+
+# Complex research task from file
+uv run python src/main.py --prompt-file tasks/ai-research.txt \
+  --config configs/high-quality.yaml
 
 # Read and analyze a file
 uv run python src/main.py "What is the first line of README.md?" \

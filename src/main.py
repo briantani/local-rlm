@@ -14,9 +14,27 @@ load_dotenv()
 def main():
     parser = argparse.ArgumentParser(
         description="Run the RLM Agent on a task using YAML configuration profiles.",
-        epilog="Example: uv run python src/main.py 'Calculate fibonacci(20)' --config configs/paper-gpt5.yaml"
+        epilog=(
+            "Examples:\n"
+            "  uv run python src/main.py 'Calculate fibonacci(20)' --config configs/paper-gpt5.yaml\n"
+            "  uv run python src/main.py --prompt-file tasks/research.txt --config configs/high-quality.yaml"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("task", help="The natural language task to perform.")
+
+    # Make task and prompt-file mutually exclusive
+    task_group = parser.add_mutually_exclusive_group(required=True)
+    task_group.add_argument(
+        "task",
+        nargs="?",
+        help="The natural language task to perform (or use --prompt-file for longer tasks)."
+    )
+    task_group.add_argument(
+        "--prompt-file",
+        type=Path,
+        help="Path to a text file containing the task description (for verbose/complex prompts)."
+    )
+
     parser.add_argument(
         "--config",
         type=Path,
@@ -31,6 +49,23 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Read task from file if --prompt-file is provided
+    if args.prompt_file:
+        try:
+            task = args.prompt_file.read_text(encoding="utf-8").strip()
+            if not task:
+                logger.error(f"Prompt file is empty: {args.prompt_file}")
+                return
+            logger.info(f"Loaded task from: {args.prompt_file}")
+        except FileNotFoundError:
+            logger.error(f"Prompt file not found: {args.prompt_file}")
+            return
+        except Exception as e:
+            logger.error(f"Failed to read prompt file: {e}")
+            return
+    else:
+        task = args.task
 
     # Load configuration profile
     try:
@@ -71,8 +106,8 @@ def main():
     )
 
     # Run Task
-    logger.info(f"Starting Agent with task: '{args.task}'")
-    result = agent.run(args.task)
+    logger.info(f"Starting Agent with task: '{task[:100]}{'...' if len(task) > 100 else ''}'")
+    result = agent.run(task)
 
     logger.info("\n" + "="*50)
     logger.info("FINAL RESULT:")

@@ -1,0 +1,80 @@
+# AI Research Task: State of the Art Analysis (2020-2025)
+
+## Objective
+Conduct a comprehensive analysis of artificial intelligence advancements between 2020 and 2025, producing a detailed report with visualizations, data tables, and trend analysis.
+
+## Deliverables
+
+### 1. Executive Summary
+- High-level overview of key breakthroughs
+- Major paradigm shifts identified
+- Impact assessment across industries
+
+### 2. Technical Deep Dive
+
+#### Language Models
+- Evolution from GPT-3 (2020) to current state-of-the-art
+- Model size trends and efficiency improvements
+- Breakthrough architectures (Transformers, Mamba, etc.)
+- Context length improvements (4K → 1M+ tokens)
+
+#### Computer Vision
+- Vision Transformers (ViT) adoption
+- Diffusion models (DALL-E, Stable Diffusion, Midjourney)
+- Multi-modal capabilities (CLIP, GPT-4V, Gemini)
+
+#### Reinforcement Learning
+- AlphaFold 2 and protein folding
+- Game-playing agents (Dota 2, StarCraft II)
+- Robotics applications
+
+### 3. Data Analysis Requirements
+
+Generate the following visualizations:
+- Timeline chart of major model releases
+- Bar chart comparing model parameters over time
+- Line graph showing compute costs trends
+- Heat map of AI adoption by industry sector
+
+### 4. Trend Identification
+
+Analyze and identify:
+- Emerging research directions
+- Convergence of modalities (text, image, audio, video)
+- Open-source vs. proprietary models dynamics
+- Safety and alignment research trends
+
+### 5. Future Projections
+
+Provide speculative analysis on:
+- Expected capabilities by 2027-2030
+- Potential bottlenecks (compute, data, architecture)
+- Societal impact predictions
+- Regulatory landscape evolution
+
+## Methodology
+
+1. Research publicly available papers, benchmarks, and announcements
+2. Synthesize findings into coherent narrative
+3. Generate visualizations using matplotlib/seaborn
+4. Create markdown tables for quantitative comparisons
+5. Provide citations and references
+
+## Output Format
+
+Produce a comprehensive markdown report (~5000-7000 words) with:
+- Clear section headings
+- Embedded data visualizations (saved as PNG)
+- Comparison tables
+- Citation section with links to sources
+- Executive summary at the beginning
+- Conclusions and future outlook at the end
+
+## Success Criteria
+
+- Comprehensive coverage of the 2020-2025 period
+- At least 5 high-quality visualizations
+- Minimum 3 comparison tables with quantitative data
+- Insightful analysis beyond mere fact reporting
+- Clear writing suitable for technical audience
+- Professional formatting throughout
