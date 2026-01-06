@@ -168,22 +168,22 @@ Methodology: Iterative Sprints. Strict ATest-Driven Development (TDD). Stack: Py
 
 ### **📋 Implementation Steps**
 
-1.  **Dependency Installation**:
-    *   Install libraries required for the *REPL* to read files: `pandas`, `openpyxl`, `pypdf`, `python-docx`.
-2.  **File Explorer (`src/core/explorer.py`):**
-    *   Implement `scan_directory(path: Path) -> str`.
-    *   Returns a tree-like text structure or list of available files and their paths.
-    *   Does **NOT** load content.
-3.  **Context Integration:**
-    *   Update `RLMAgent.__init__` to accept `root_dir`.
-    *   Call `explorer.scan_directory` and inject the *file list* into `data_desc`.
-    *   **Crucial:** Ensure Prompts know that to *know* the content, they must generate code to *read* the content.
+1. **Dependency Installation**:
+    * Install libraries required for the *REPL* to read files: `pandas`, `openpyxl`, `pypdf`, `python-docx`.
+2. **File Explorer (`src/core/explorer.py`):**
+    * Implement `scan_directory(path: Path) -> str`.
+    * Returns a tree-like text structure or list of available files and their paths.
+    * Does **NOT** load content.
+3. **Context Integration:**
+    * Update `RLMAgent.__init__` to accept `root_dir`.
+    * Call `explorer.scan_directory` and inject the *file list* into `data_desc`.
+    * **Crucial:** Ensure Prompts know that to *know* the content, they must generate code to *read* the content.
 
 ### **✅ Verification (Tests)**
 
 * **Test 6.1 (Explorer):** Point to a temp folder and verify the string output lists files correctly.
 * **Test 6.2 (REPL Read):** Agent is given a folder with `secret.txt`. Task: "What is the secret?".
-    *   Expectation: Agent generates `open('secret.txt').read()`, executes it, sees the secret in REPL output, and answers.
+  * Expectation: Agent generates `open('secret.txt').read()`, executes it, sees the secret in REPL output, and answers.
 
 ### **🛑 Definition of Done**
 
@@ -197,26 +197,26 @@ Methodology: Iterative Sprints. Strict ATest-Driven Development (TDD). Stack: Py
 
 ### **📋 Implementation Steps**
 
-1.  **Training Data Construction (`src/optimization/data.py`):**
-    *   Create a dataset of `(task, context_state) -> action` examples.
-    *   Crucially include examples where context *already has the answer*, labeled as `ANSWER`.
-2.  **Optimization Script (`src/optimization/compile_architect.py`):**
-    *   Initialize `teleprompter = BootstrapFewShot(metric=validate_action)`.
-    *   Compile the `Architect` module.
-    *   Save the optimized program to `src/modules/compiled_architect.json`.
-3.  **Integration:**
-    *   Update `Architect.__init__` to load the compiled JSON if it exists.
+1. **Training Data Construction (`src/optimization/data.py`):**
+    * Create a dataset of `(task, context_state) -> action` examples.
+    * Crucially include examples where context *already has the answer*, labeled as `ANSWER`.
+2. **Optimization Script (`src/optimization/compile_architect.py`):**
+    * Initialize `teleprompter = BootstrapFewShot(metric=validate_action)`.
+    * Compile the `Architect` module.
+    * Save the optimized program to `src/modules/compiled_architect.json`.
+3. **Integration:**
+    * Update `Architect.__init__` to load the compiled JSON if it exists.
 
 ### **✅ Verification (Tests)**
 
-*   **Test 7.1:** Run the "First line of README" task. Verify it stops after reading.
-*   **Test 7.2:** Run the optimization script and verify a JSON file is produced.
+* **Test 7.1:** Run the "First line of README" task. Verify it stops after reading.
+* **Test 7.2:** Run the optimization script and verify a JSON file is produced.
 
 ### **🛑 Definition of Done**
 
-*   [x] `compile_architect.py` runs successfully.
-*   [x] Agent loads optimized weights.
-*   [x] Infinite loop on file reading is resolved (Validated with `qwen2.5-coder`).
+* [x] `compile_architect.py` runs successfully.
+* [x] Agent loads optimized weights.
+* [x] Infinite loop on file reading is resolved (Validated with `qwen2.5-coder`).
 
 ## **🛠️ Phase 8: Enhanced Tooling & Retrieval**
 
@@ -224,27 +224,27 @@ Methodology: Iterative Sprints. Strict ATest-Driven Development (TDD). Stack: Py
 
 ### **📋 Implementation Steps**
 
-1.  **Dependency Updates:**
-    *   Add primary libraries: `openpyxl` (Excel), `pdfplumber` (PDF Tables), `chromadb` (Semantic Search), `duckduckgo-search` (Web).
-2.  **REPL Preloading (`src/core/repl.py`):**
-    *   Ensure these libraries are importable.
-    *   (Optional) Pre-import helper functions if simplifying usage is needed (e.g., a `search_web(query)` wrapper around DDGS).
-3.  **Search Module (`src/tools/search.py`):**
-    *   Implement a simple wrapper for `duckduckgo-search` to handle rate limits/errors gracefully.
-4.  **Coder Training:**
-    *   Update `src/modules/coder.py` few-shot examples to demonstrate using `pdfplumber` for tables and `openpyxl` for formulas.
+1. **Dependency Updates:**
+    * Add primary libraries: `openpyxl` (Excel), `pdfplumber` (PDF Tables), `chromadb` (Semantic Search), `duckduckgo-search` (Web).
+2. **REPL Preloading (`src/core/repl.py`):**
+    * Ensure these libraries are importable.
+    * (Optional) Pre-import helper functions if simplifying usage is needed (e.g., a `search_web(query)` wrapper around DDGS).
+3. **Search Module (`src/tools/search.py`):**
+    * Implement a simple wrapper for `duckduckgo-search` to handle rate limits/errors gracefully.
+4. **Coder Training:**
+    * Update `src/modules/coder.py` few-shot examples to demonstrate using `pdfplumber` for tables and `openpyxl` for formulas.
 
 ### **✅ Verification (Tests)**
 
-*   **Test 8.1 (Excel):** Given an .xlsx file with a formula, Agent must read the *formula* (using openpyxl), not just the value.
-*   **Test 8.2 (PDF Table):** Given a PDF with a table, Agent must extract it as a list of lists or DataFrame.
-*   **Test 8.3 (Web Search):** Agent "Who is the current president of France?" -> Uses DDGS -> Answers correctly.
+* **Test 8.1 (Excel):** Given an .xlsx file with a formula, Agent must read the *formula* (using openpyxl), not just the value.
+* **Test 8.2 (PDF Table):** Given a PDF with a table, Agent must extract it as a list of lists or DataFrame.
+* **Test 8.3 (Web Search):** Agent "Who is the current president of France?" -> Uses DDGS -> Answers correctly.
 
 ### **🛑 Definition of Done**
 
-*   [x] REPL has access to `openpyxl`, `pdfplumber`, `chromadb`, `duckduckgo-search`.
-*   [ ] Agent can autonomously extract tables from PDFs.
-*   [x] Agent can perform live web searches.
+* [x] REPL has access to `openpyxl`, `pdfplumber`, `chromadb`, `duckduckgo-search`.
+* [ ] Agent can autonomously extract tables from PDFs.
+* [x] Agent can perform live web searches.
 
 ## **📝 Phase 9: Logging Infrastructure**
 
@@ -252,25 +252,25 @@ Methodology: Iterative Sprints. Strict ATest-Driven Development (TDD). Stack: Py
 
 ### **📋 Implementation Steps**
 
-1.  **Logger Module (`src/core/logger.py`):**
-    *   Create `setup_logger()` factory with console and file handlers.
-    *   Support DEBUG, INFO levels.
-    *   Each run creates a timestamped log file in `logs/`.
-2.  **Codebase Migration:**
-    *   Replace `print()` with `logger.info()` / `logger.debug()` across all modules.
-3.  **Git Configuration:**
-    *   Add `logs/` and `*.log` to `.gitignore`.
+1. **Logger Module (`src/core/logger.py`):**
+    * Create `setup_logger()` factory with console and file handlers.
+    * Support DEBUG, INFO levels.
+    * Each run creates a timestamped log file in `logs/`.
+2. **Codebase Migration:**
+    * Replace `print()` with `logger.info()` / `logger.debug()` across all modules.
+3. **Git Configuration:**
+    * Add `logs/` and `*.log` to `.gitignore`.
 
 ### **✅ Verification (Tests)**
 
-*   **Test 9.1:** Run agent and verify log file is created in `logs/`.
-*   **Test 9.2:** Verify log contains expected INFO/DEBUG entries.
+* **Test 9.1:** Run agent and verify log file is created in `logs/`.
+* **Test 9.2:** Verify log contains expected INFO/DEBUG entries.
 
 ### **🛑 Definition of Done**
 
-*   [x] All `print()` replaced with `logging`.
-*   [x] Log files generated per run.
-*   [x] `logs/` gitignored.
+* [x] All `print()` replaced with `logging`.
+* [x] Log files generated per run.
+* [x] `logs/` gitignored.
 
 ---
 
@@ -291,50 +291,57 @@ Methodology: Iterative Sprints. Strict ATest-Driven Development (TDD). Stack: Py
 ### **📋 Proposed Refactoring Items**
 
 #### **10.1: Dependency Injection for RLMAgent**
-*   **Current:** Agent creates `Architect`, `Coder`, `Responder`, `Delegator`, `REPL` internally.
-*   **Proposed:** Accept these as constructor parameters with sensible defaults.
-*   **Benefit:** Enables mocking for unit tests, improves testability.
-*   **Risk:** Low - backward compatible with default instantiation.
+
+* **Current:** Agent creates `Architect`, `Coder`, `Responder`, `Delegator`, `REPL` internally.
+* **Proposed:** Accept these as constructor parameters with sensible defaults.
+* **Benefit:** Enables mocking for unit tests, improves testability.
+* **Risk:** Low - backward compatible with default instantiation.
 
 #### **10.2: Protocol-Based Abstractions**
-*   **Current:** Direct class dependencies between components.
-*   **Proposed:** Define `Protocol` classes for `LMProvider`, `CodeExecutor`, `TaskRouter`.
-*   **Benefit:** Enables swapping implementations (e.g., mock REPL for tests).
-*   **Risk:** Medium - requires interface definitions.
+
+* **Current:** Direct class dependencies between components.
+* **Proposed:** Define `Protocol` classes for `LMProvider`, `CodeExecutor`, `TaskRouter`.
+* **Benefit:** Enables swapping implementations (e.g., mock REPL for tests).
+* **Risk:** Medium - requires interface definitions.
 
 #### **10.3: Lazy Logger Initialization**
-*   **Current:** `logger = setup_logger()` runs at import time, creating log files.
-*   **Proposed:** Use lazy initialization or context-based logger setup.
-*   **Benefit:** Prevents spurious log files during testing/imports.
-*   **Risk:** Low.
+
+* **Current:** `logger = setup_logger()` runs at import time, creating log files.
+* **Proposed:** Use lazy initialization or context-based logger setup.
+* **Benefit:** Prevents spurious log files during testing/imports.
+* **Risk:** Low.
 
 #### **10.4: BudgetManager Refactoring**
-*   **Current:** Singleton with `__new__` override + `_initialized` flag.
-*   **Proposed:** Use a proper singleton decorator or dependency injection.
-*   **Benefit:** Cleaner code, easier reset for tests.
-*   **Risk:** Low.
+
+* **Current:** Singleton with `__new__` override + `_initialized` flag.
+* **Proposed:** Use a proper singleton decorator or dependency injection.
+* **Benefit:** Cleaner code, easier reset for tests.
+* **Risk:** Low.
 
 #### **10.5: Test Improvements**
-*   **Current:** `test_parallel.py` depends on LLM correctly choosing DELEGATE.
-*   **Proposed:**
-    *   Mock the `Architect` to force DELEGATE action.
-    *   Add unit tests for delegation logic separate from LLM integration.
-*   **Benefit:** Reliable CI, faster tests.
-*   **Risk:** Low.
+
+* **Current:** `test_parallel.py` depends on LLM correctly choosing DELEGATE.
+* **Proposed:**
+  * Mock the `Architect` to force DELEGATE action.
+  * Add unit tests for delegation logic separate from LLM integration.
+* **Benefit:** Reliable CI, faster tests.
+* **Risk:** Low.
 
 #### **10.6: Compiled Module Loading Strategy**
-*   **Current:** Modules check for compiled JSON in `__init__`.
-*   **Proposed:** Centralize compiled module discovery in `config.py` or a dedicated loader.
-*   **Benefit:** Single source of truth for optimization artifacts.
-*   **Risk:** Low.
+
+* **Current:** Modules check for compiled JSON in `__init__`.
+* **Proposed:** Centralize compiled module discovery in `config.py` or a dedicated loader.
+* **Benefit:** Single source of truth for optimization artifacts.
+* **Risk:** Low.
 
 ### **✅ Pre-Refactoring Test Coverage Requirements**
 
 Before implementing any refactoring:
-- [ ] `test_agent.py`: Add unit tests for each action branch (CODE, ANSWER, DELEGATE)
-- [ ] `test_budget.py`: Ensure singleton reset works correctly ✅ (exists)
-- [ ] `test_repl.py`: Cover edge cases ✅ (exists)
-- [ ] Add mocking infrastructure in `conftest.py` for DSPy modules
+
+* [ ] `test_agent.py`: Add unit tests for each action branch (CODE, ANSWER, DELEGATE)
+* [ ] `test_budget.py`: Ensure singleton reset works correctly ✅ (exists)
+* [ ] `test_repl.py`: Cover edge cases ✅ (exists)
+* [ ] Add mocking infrastructure in `conftest.py` for DSPy modules
 
 ### **📊 Current Test Coverage Summary**
 
@@ -348,10 +355,10 @@ Before implementing any refactoring:
 
 ### **🛑 Definition of Done**
 
-*   [x] All refactoring items approved by stakeholder.
-*   [x] Unit test coverage added before refactoring.
-*   [x] Each refactoring item implemented incrementally with passing tests.
-*   [x] No regression in existing functionality.
+* [x] All refactoring items approved by stakeholder.
+* [x] Unit test coverage added before refactoring.
+* [x] Each refactoring item implemented incrementally with passing tests.
+* [x] No regression in existing functionality.
 
 ### **⏳ Estimated Effort**
 
@@ -380,9 +387,10 @@ From the RLM paper (arXiv:2512.24601v1):
 > "For the GPT-5 experiments, we use GPT-5-mini for the recursive LMs and GPT-5 for the root LM, as we found this choice to strike a powerful tradeoff between the capabilities of RLMs and the cost of the recursive calls."
 
 This demonstrates the value of:
-- **Asymmetric model allocation**: Use cheaper/faster models for sub-calls
-- **Role-based model selection**: Different models for Architect, Coder, Delegator
-- **Profile-based configuration**: Different setups for different task types
+
+* **Asymmetric model allocation**: Use cheaper/faster models for sub-calls
+* **Role-based model selection**: Different models for Architect, Coder, Delegator
+* **Profile-based configuration**: Different setups for different task types
 
 ### **📋 Implementation Steps**
 
@@ -441,12 +449,13 @@ dspy:
 ```
 
 **Key Features:**
-- **Per-Model Pricing**: Each model config has its own `pricing` block
-- **Global Budget Limit**: Single `max_usd` applies to sum of all model costs
-- **Hierarchical**: root vs. delegate configuration
-- **Per-Module Overrides**: Different models for Architect, Coder, etc.
-- **Profile Inheritance**: Support `extends: base-config.yaml`
-- **Environment Variable Substitution**: `${GEMINI_API_KEY}`
+
+* **Per-Model Pricing**: Each model config has its own `pricing` block
+* **Global Budget Limit**: Single `max_usd` applies to sum of all model costs
+* **Hierarchical**: root vs. delegate configuration
+* **Per-Module Overrides**: Different models for Architect, Coder, etc.
+* **Profile Inheritance**: Support `extends: base-config.yaml`
+* **Environment Variable Substitution**: `${GEMINI_API_KEY}`
 
 #### **11.2: Enhanced BudgetManager for Multi-Model Tracking**
 
@@ -508,32 +517,36 @@ class ModelUsage:
 ```
 
 **Benefits:**
-- Accurate cost tracking per model
-- Single global budget limit still enforced
-- Detailed breakdown for cost analysis
-- Thread-safe for concurrent model calls
+
+* Accurate cost tracking per model
+* Single global budget limit still enforced
+* Detailed breakdown for cost analysis
+* Thread-safe for concurrent model calls
 
 #### **11.3: Configuration Loader Implementation**
 
 **File:** `src/core/config_loader.py`
 
 **Classes:**
-- `ModelConfig`: Provider, model name, pricing info
-- `AgentConfig`: max_steps, max_depth
-- `ProfileConfig`: Root, delegate, modules, global budget
-- `ConfigLoader`: Loads YAML, validates, resolves inheritance
+
+* `ModelConfig`: Provider, model name, pricing info
+* `AgentConfig`: max_steps, max_depth
+* `ProfileConfig`: Root, delegate, modules, global budget
+* `ConfigLoader`: Loads YAML, validates, resolves inheritance
 
 **Functions:**
-- `load_profile(path: Path) -> ProfileConfig`
-- `merge_with_env(config: ProfileConfig) -> ProfileConfig`  # Override with .env
-- `validate_config(config: ProfileConfig) -> bool`
-- `register_models_with_budget(config: ProfileConfig, budget_manager: BudgetManager)`
+
+* `load_profile(path: Path) -> ProfileConfig`
+* `merge_with_env(config: ProfileConfig) -> ProfileConfig`  # Override with .env
+* `validate_config(config: ProfileConfig) -> bool`
+* `register_models_with_budget(config: ProfileConfig, budget_manager: BudgetManager)`
 
 **Error Handling:**
-- Missing required fields → helpful error messages
-- Invalid model names → suggest alternatives
-- Missing API keys → point to .env setup
-- Missing pricing info → use provider defaults with warning
+
+* Missing required fields → helpful error messages
+* Invalid model names → suggest alternatives
+* Missing API keys → point to .env setup
+* Missing pricing info → use provider defaults with warning
 
 #### **11.4: Update `config.py` for Multi-Model Support**
 
@@ -542,14 +555,16 @@ class ModelUsage:
 **New:** `get_lm_for_role(role: str, config: ProfileConfig) -> dspy.LM`
 
 **Roles:**
-- `"root"`: Main agent LM
-- `"delegate"`: Sub-agent LM
-- `"architect"`: Architect module LM
-- `"coder"`: Coder module LM
-- `"responder"`: Responder module LM
-- `"delegator"`: Delegator module LM
+
+* `"root"`: Main agent LM
+* `"delegate"`: Sub-agent LM
+* `"architect"`: Architect module LM
+* `"coder"`: Coder module LM
+* `"responder"`: Responder module LM
+* `"delegator"`: Delegator module LM
 
 **Logic:**
+
 1. Check if `config.modules.{role}` exists → use that
 2. Else if role is delegate → use `config.delegate`
 3. Else → use `config.root`
@@ -558,11 +573,13 @@ class ModelUsage:
 #### **11.5: Modify `RLMAgent` to Accept Profile**
 
 **Current Constructor:**
+
 ```python
 def __init__(self, max_steps=10, max_depth=3, ...)
 ```
 
 **New Constructor:**
+
 ```python
 def __init__(
     self,
@@ -575,9 +592,10 @@ def __init__(
 ```
 
 **Behavior:**
-- If `config` is provided, use it to configure modules
-- If `is_delegate=True`, use `config.delegate` settings
-- Create sub-agents with `is_delegate=True`
+
+* If `config` is provided, use it to configure modules
+* If `is_delegate=True`, use `config.delegate` settings
+* Create sub-agents with `is_delegate=True`
 
 #### **11.5: Update DSPy Module Initialization**
 
@@ -593,8 +611,9 @@ with dspy.context(lm=self.lm):
 ```
 
 **Challenge:** DSPy 3.x uses global settings. Need to either:
-- Use `dspy.context()` context manager per module
-- OR create separate DSPy programs per module
+
+* Use `dspy.context()` context manager per module
+* OR create separate DSPy programs per module
 
 #### **11.6: CLI Integration**
 
@@ -609,39 +628,46 @@ parser.add_argument(
 ```
 
 **Behavior:**
+
 1. If `--config` provided, load profile
 2. CLI args override profile (e.g., `--max-steps 20`)
 3. `.env` provides API keys (not in YAML for security)
 
 **Backward Compatibility:**
-- If no `--config`, use current .env + CLI args behavior
+
+* If no `--config`, use current .env + CLI args behavior
 
 #### **11.7: Create Example Configuration Profiles**
 
 Create `configs/` directory with:
 
 **`configs/cost-effective.yaml`**
-- Gemini Flash for everything
-- Low max_steps, shallow depth
-- $0.50 budget
+
+* Gemini Flash for everything
+* Low max_steps, shallow depth
+* $0.50 budget
 
 **`configs/high-quality.yaml`** (Paper-inspired)
-- GPT-4o for root
-- GPT-4o-mini for delegates
-- Higher budget, more steps
+
+* GPT-4o for root
+* GPT-4o-mini for delegates
+* Higher budget, more steps
 
 **`configs/local-only.yaml`**
-- Ollama qwen2.5-coder for all roles
-- No budget limits (local is free)
+
+* Ollama qwen2.5-coder for all roles
+* No budget limits (local is free)
 
 **`configs/hybrid.yaml`** (Best of both worlds)
-- Ollama for Coder (fast local code generation)
-- Gemini for Architect/Responder (better reasoning)
-- GPT-4o-mini for Delegator
+
+* Ollama for Coder (fast local code generation)
+* Gemini for Architect/Responder (better reasoning)
+* GPT-4o-mini for Delegator
 
 ### **✅ Verification (Tests)**
 
 **Test 11.1: Configuration Loading**
+
 ```python
 def test_load_valid_profile():
     config = load_profile("configs/cost-effective.yaml")
@@ -651,6 +677,7 @@ def test_load_valid_profile():
 ```
 
 **Test 11.2: Profile Inheritance**
+
 ```python
 def test_profile_extends():
     # configs/derived.yaml extends configs/base.yaml
@@ -660,6 +687,7 @@ def test_profile_extends():
 ```
 
 **Test 11.3: Multi-Model Budget Tracking**
+
 ```python
 def test_per_model_budget_tracking():
     budget = BudgetManager(max_budget=10.0)
@@ -685,6 +713,7 @@ def test_per_model_budget_tracking():
 ```
 
 **Test 11.4: Budget Limit Across Models**
+
 ```python
 def test_budget_limit_sums_all_models():
     BudgetManager._clear()
@@ -701,6 +730,7 @@ def test_budget_limit_sums_all_models():
 ```
 
 **Test 11.5: Multi-Model Agent**
+
 ```python
 def test_agent_uses_different_models():
     config = load_profile("configs/hybrid.yaml")
@@ -714,6 +744,7 @@ def test_agent_uses_different_models():
 ```
 
 **Test 11.6: Delegate Model Separation**
+
 ```python
 def test_delegate_uses_cheaper_model():
     config = load_profile("configs/high-quality.yaml")
@@ -728,6 +759,7 @@ def test_delegate_uses_cheaper_model():
 ```
 
 **Test 11.7: CLI Override**
+
 ```python
 def test_cli_overrides_config(capsys):
     # Run with config but override max_steps
@@ -741,20 +773,21 @@ def test_cli_overrides_config(capsys):
 
 ### **🛑 Definition of Done**
 
-- [x] YAML schema defined with per-model pricing
-- [x] `BudgetManager` enhanced for multi-model tracking
-- [x] `ConfigLoader` class implemented with tests
-- [x] `get_lm_for_role()` supports per-module models with pricing
-- [x] `RLMAgent` accepts and uses `ProfileConfig`
-- [x] At least 4 example profiles created with pricing
-- [x] CLI `--config` flag working
+* [x] YAML schema defined with per-model pricing
+* [x] `BudgetManager` enhanced for multi-model tracking
+* [x] `ConfigLoader` class implemented with tests
+* [x] `get_lm_for_role()` supports per-module models with pricing
+* [x] `RLMAgent` accepts and uses `ProfileConfig`
+* [x] At least 4 example profiles created with pricing
+* [x] CLI `--config` flag working
 
 ---
 
 **✅ Phase 11 Complete!** YAML configuration profiles with per-model pricing have been implemented and verified.
-- [ ] All tests passing (unit + integration)
-- [ ] Documentation updated in README.md
-- [ ] Backward compatibility maintained (old .env method still works)
+
+* [ ] All tests passing (unit + integration)
+* [ ] Documentation updated in README.md
+* [ ] Backward compatibility maintained (old .env method still works)
 
 ### **📊 Benefits**
 
@@ -791,13 +824,14 @@ def test_cli_overrides_config(capsys):
 3. **Validation**: Fail fast with helpful errors if config is invalid.
 4. **Caching**: Consider caching loaded profiles to avoid repeated YAML parsing.
 5. **Per-Model Budget Tracking**:
-   - Each model registered with its own pricing info
-   - `add_usage(model_id, input_tokens, output_tokens)` calculates cost per-model
-   - Global `current_cost` sums all model costs
-   - `check_budget()` enforces single global limit
-   - `get_breakdown()` returns per-model cost analysis
+   * Each model registered with its own pricing info
+   * `add_usage(model_id, input_tokens, output_tokens)` calculates cost per-model
+   * Global `current_cost` sums all model costs
+   * `check_budget()` enforces single global limit
+   * `get_breakdown()` returns per-model cost analysis
 
 **Per-Model Pricing Example:**
+
 ```yaml
 # paper-gpt5.yaml - each model has its own pricing:
 root:
@@ -817,6 +851,7 @@ budget:
 ```
 
 **Cost Calculation Flow:**
+
 ```
 1. Agent uses GPT-4o (Architect): 100K in, 10K out
    → Cost: (100K/1M × $2.50) + (10K/1M × $10.00) = $0.35
@@ -831,10 +866,10 @@ budget:
 
 ### **📈 Success Metrics**
 
-- [ ] Can run: `uv run python src/main.py "task" --config configs/high-quality.yaml`
-- [ ] Root agent uses different model than sub-agents
-- [ ] Budget tracking works across all models
-- [ ] Configuration reduces from 5+ CLI args to 1 (the YAML path)
+* [ ] Can run: `uv run python src/main.py "task" --config configs/high-quality.yaml`
+* [ ] Root agent uses different model than sub-agents
+* [ ] Budget tracking works across all models
+* [ ] Configuration reduces from 5+ CLI args to 1 (the YAML path)
 
 ---
 

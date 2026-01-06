@@ -5,12 +5,14 @@ This directory contains YAML configuration files for different RLM agent profile
 ## 📁 Available Profiles
 
 ### `paper-gpt5.yaml` — Research Paper Replication ⭐
+
 **Based on:** Exact RLM paper setup (arXiv:2512.24601v1)
 **Use Case:** Reproduce research results, maximum quality, academic benchmarking
 **Cost:** ~$5/task (paper averaged $0.99 for BrowseComp+)
 **Strategy:** GPT-5 for root, GPT-5-mini for delegates (now publicly available!)
 
 **Paper Results:**
+
 - BrowseComp+ (1K): 91.33% accuracy (base model: 0%)
 - OOLONG-Pairs: 58.00% F1 (base model: 0.04%)
 - CodeQA: 62.00% accuracy (base model: 24%)
@@ -20,6 +22,7 @@ uv run python src/main.py "Complex research task" --config configs/paper-gpt5.ya
 ```
 
 ### `high-quality.yaml` — Maximum Capability
+
 **Based on:** GPT-5.2 (OpenAI's best coding/agentic model)
 **Use Case:** Complex research, deep analysis, maximum accuracy
 **Cost:** ~$5/task
@@ -30,6 +33,7 @@ uv run python src/main.py "Analyze quantum computing trends" --config configs/hi
 ```
 
 ### `cost-effective.yaml` — Budget-Friendly
+
 **Use Case:** Development, testing, production tasks with cost control
 **Cost:** ~$0.50/task
 **Strategy:** Gemini 2.5 Flash (best price-performance) with Flash-Lite for delegates
@@ -39,6 +43,7 @@ uv run python src/main.py "Calculate Fibonacci 100" --config configs/cost-effect
 ```
 
 ### `local-only.yaml` — Complete Privacy
+
 **Use Case:** Sensitive data, offline work, no API costs
 **Cost:** $0 (local hardware only)
 **Strategy:** Ollama qwen2.5-coder, larger model for root, smaller for delegates
@@ -48,6 +53,7 @@ uv run python src/main.py "Review this confidential document" --config configs/l
 ```
 
 ### `hybrid.yaml` — Best of Both Worlds
+
 **Use Case:** Production applications, balanced performance
 **Cost:** ~$2/task
 **Strategy:** Gemini 3 Flash for reasoning, local Ollama for fast code generation
@@ -57,6 +63,7 @@ uv run python src/main.py "Build a web scraper" --config configs/hybrid.yaml
 ```
 
 ### `base.yaml` — Template
+
 **Use Case:** Starting point for custom profiles
 **Strategy:** Extend this to create your own configurations
 
@@ -169,6 +176,7 @@ YAML configs will reference these automatically.
 | **Ollama** | qwen2.5-coder:7b | $0 | $0 | Local (lighter model) |
 
 **Cost Calculation Example:**
+
 ```
 Task uses: 100K input tokens, 20K output tokens
 Model: GPT-4o
@@ -197,18 +205,22 @@ Cost = (100,000 / 1,000,000 × $2.50) + (20,000 / 1,000,000 × $10.00)
 ### Model Selection Strategy
 
 **Root Agent (Main Orchestrator):**
+
 - Needs strong reasoning for Architect decisions
 - Consider: GPT-4o, Gemini 2.5 Pro, or large Qwen local
 
 **Delegate Agents (Sub-Tasks):**
+
 - Often simpler tasks (process a chunk, analyze a section)
 - Consider: GPT-4o-mini, Gemini Flash, or smaller Qwen
 
 **Coder Module:**
+
 - Code generation benefits from specialized models
 - Consider: Qwen2.5-coder (local), GPT-4o, Gemini Flash
 
 **Responder Module:**
+
 - Final answer quality matters
 - Consider: Same as root or slightly better
 
