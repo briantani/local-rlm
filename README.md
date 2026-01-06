@@ -200,7 +200,7 @@ uv run python src/main.py "What is 2^100?" --provider ollama
 uv run python src/main.py "What is the first line of README.md?" --context .
 
 # Use a specific model
-uv run python src/main.py "Explain recursion" --provider gemini --model gemini-1.5-pro
+uv run python src/main.py "Explain recursion" --provider gemini --model gemini-2.5-pro
 
 # Complex task with file context
 uv run python src/main.py "Analyze the sales data and find the top 3 products" --context ./data --provider openai
