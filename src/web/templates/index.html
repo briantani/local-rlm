@@ -189,7 +189,7 @@
 
         <!-- Final Result - Canvas View -->
         <div x-show="result" x-cloak>
-            <div x-data="canvasViewer(result, taskId)">
+            <div x-data="canvasViewer(result, taskId, steps)">
                 {% include 'components/canvas.html' %}
             </div>
         </div>
@@ -522,16 +522,33 @@ function taskRunner() {
                     break;
 
                 case 'code':
-                    // Code generated
-                    if (this.steps.length > 0) {
+                    // Code generated - create step if doesn't exist
+                    if (this.steps.length === 0 || this.steps[this.steps.length - 1].code !== null) {
+                        // New CODE step
+                        this.steps.push({
+                            action: 'CODE',
+                            status: 'running',
+                            code: update.data.code,
+                            output: null
+                        });
+                    } else {
                         this.steps[this.steps.length - 1].code = update.data.code;
                     }
                     break;
 
                 case 'output':
-                    // Code execution output
-                    if (this.steps.length > 0) {
+                    // Code execution output - ensure step exists
+                    if (this.steps.length === 0) {
+                        // Create step if missing
+                        this.steps.push({
+                            action: 'CODE',
+                            status: 'running',
+                            code: null,
+                            output: update.data.output
+                        });
+                    } else {
                         this.steps[this.steps.length - 1].output = update.data.output;
+                        this.steps[this.steps.length - 1].status = 'complete';
                     }
                     break;
 

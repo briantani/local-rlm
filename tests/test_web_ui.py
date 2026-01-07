@@ -645,8 +645,8 @@ class TestCanvasComponent:
         assert response.status_code == 200
         content = response.content.decode()
 
-        # Should pass result and taskId to canvas function
-        assert "canvasViewer(result, taskId)" in content, "Canvas not receiving parameters"
+        # Should pass result, taskId, and steps to canvas function
+        assert "canvasViewer(result, taskId, steps)" in content, "Canvas not receiving parameters"
 
     def test_canvas_displays_final_answer(self, client):
         """Test that canvas has section for final answer."""

@@ -136,7 +136,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                     Execution Logs
-                    <span class="ml-2 text-xs text-gray-500">(<span x-text="executionHistory.length"></span> steps)</span>
+                    <span class="ml-2 text-xs text-gray-500">(<span x-text="displayHistory.length"></span> steps)</span>
                 </h4>
                 <svg
                     class="w-5 h-5 text-gray-500 transform transition-transform"
@@ -156,7 +156,7 @@
                     </p>
 
                     <div class="space-y-4">
-                        <template x-for="(step, index) in executionHistory" :key="index">
+                        <template x-for="(step, index) in displayHistory" :key="index">
                             <div class="relative pl-8 pb-4 border-l-2 border-gray-300 last:border-l-0">
                                 <!-- Timeline Dot -->
                                 <div class="absolute left-0 top-0 -ml-2 w-4 h-4 rounded-full"
@@ -210,15 +210,31 @@
 </div>
 
 <script>
-function canvasViewer(initialResult, initialTaskId) {
+function canvasViewer(initialResult, initialTaskId, liveSteps) {
     return {
         result: initialResult || null,
         executionHistory: initialResult?.execution_history || [],
+        liveSteps: liveSteps || [],
         taskId: initialTaskId || null,
         showLogs: false,  // Logs collapsed by default
 
         init() {
             // Data is passed directly from parent - no need to parse from dataset
+        },
+
+        // Get combined execution history (live steps during execution, final history after completion)
+        get displayHistory() {
+            // If task is complete, use the final execution_history
+            if (this.result && this.executionHistory.length > 0) {
+                return this.executionHistory;
+            }
+            // Otherwise, show live steps being executed
+            return this.liveSteps.map((step, index) => ({
+                step: index + 1,
+                action: step.action || 'UNKNOWN',
+                input: step.code || step.input || '',
+                output: step.output || ''
+            }));
         },
 
         formatMarkdown(text) {
