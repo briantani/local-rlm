@@ -24,6 +24,23 @@ manage its own context window more effectively.
   **DSPy**.
 - **Local & Cloud Support:** Configurable to run with local models (Ollama)
   or cloud providers (Gemini, OpenAI).
+- **Web Interface:** Full-featured FastAPI + HTMX + Alpine.js UI with:
+  - Real-time streaming execution with WebSocket
+  - Task history and management
+  - Rich canvas view with export (Markdown, JSON, PDF)
+  - Shareable links and task templates
+  - Configuration management UI
+
+## Project Status
+
+📊 **Track Progress**: [View all phases on GitHub Issues →](https://github.com/briantani/local-rlm/issues?q=is%3Aissue+label%3Aphase)
+
+**Milestones:**
+- ✅ [CLI Completion](https://github.com/briantani/local-rlm/milestone/1) (Phases 0-11) - Core agent functionality complete
+- ✅ [Web App MVP](https://github.com/briantani/local-rlm/milestone/2) (Phases 12-17) - Web interface complete
+- 🚧 Phase 18 (Polish & Production Readiness) - In progress
+
+**Development Plan**: See [docs/AGILE_PLAN.md](docs/AGILE_PLAN.md) for legacy documentation or [GitHub Issues](https://github.com/briantani/local-rlm/issues) for active tracking.
 
 ---
 
@@ -128,8 +145,20 @@ For full details on each profile, model pricing, and selection strategies, see
 
 ### Step 3: Run the Agent
 
+#### CLI Mode
+
 ```bash
 uv run python src/main.py "<your task>" --config configs/<profile>.yaml
+```
+
+#### Web UI Mode
+
+```bash
+# Start the web server
+uv run python src/web/app.py
+
+# Open browser to http://localhost:8000
+# Select configuration, enter task, and watch real-time execution
 ```
 
 #### Example: Local Execution (No API Keys Needed)
@@ -324,14 +353,39 @@ for todo in todos:
 
 ## Usage
 
-### Basic Syntax
+### Web Interface (Recommended)
+
+The web interface provides the easiest way to interact with the agent:
+
+```bash
+# Start the web server
+uv run python src/web/app.py
+
+# Open http://localhost:8000 in your browser
+```
+
+**Features:**
+- 🎯 Select configuration profile from dropdown
+- ⚡ Real-time streaming execution
+- 📊 Rich canvas view with formatted output
+- 💾 Export results (Markdown, JSON, PDF)
+- 🔗 Share tasks with secure links
+- 📝 Save tasks as reusable templates
+- 📜 View task history
+- 💰 Live cost tracking
+
+See [src/web/README.md](src/web/README.md) for full web UI documentation.
+
+### CLI Mode
+
+#### Basic Syntax
 
 ```bash
 # Short tasks: Use inline string
-uv run python src/main.py "<your task>" --config <profile.yaml> [--context <path>]
+uv run python src/main.py "<your task>" --config <profile>.yaml [--context <path>]
 
 # Long/complex tasks: Use prompt file
-uv run python src/main.py --prompt-file <task.txt> --config <profile.yaml> [--context <path>]
+uv run python src/main.py --prompt-file <task.txt> --config <profile>.yaml [--context <path>]
 ```
 
 ### Arguments
@@ -384,29 +438,71 @@ uv run pytest --cov=src
 
 ```text
 src/
-├── core/
+├── core/               # Core infrastructure
 │   ├── agent.py       # Main RLM Agent orchestrator
 │   ├── budget.py      # Token usage tracking & limits
 │   ├── logger.py      # Lazy logging configuration
 │   ├── repl.py        # Stateful Python sandbox
 │   └── explorer.py    # File system scanner
-├── modules/
+├── modules/            # DSPy modules
 │   ├── architect.py   # Decision maker (CODE/ANSWER/DELEGATE)
 │   ├── coder.py       # Python code generator
 │   ├── responder.py   # Natural language responder
 │   └── delegator.py   # Task decomposer for parallelism
+├── rlm/                # Service layer
+│   └── services/      # Business logic (TaskService, ConfigService, etc.)
+├── web/                # Web application
+│   ├── app.py         # FastAPI backend with WebSocket streaming
+│   ├── task_runner.py # Async task executor
+│   └── templates/     # HTMX + Alpine.js UI components
 ├── tools/
 │   └── search.py      # Web search integration
 ├── config.py          # LLM provider configuration
 └── main.py            # CLI entry point
+
+configs/                # Configuration profiles
+scripts/                # Utility scripts
+tests/                  # Comprehensive test suite
 ```
 
 ---
 
-## Development Roadmap
+## Development & Contribution
 
-See [AGILE_PLAN.md](AGILE_PLAN.md) for the full development roadmap and
-current status.
+### Project Tracking
+
+- **GitHub Issues**: [View all phases →](https://github.com/briantani/local-rlm/issues?q=is%3Aissue+label%3Aphase)
+- **Milestones**: [CLI Completion](https://github.com/briantani/local-rlm/milestone/1) ✅ | [Web App MVP](https://github.com/briantani/local-rlm/milestone/2) ✅
+- **Legacy Docs**: [docs/AGILE_PLAN.md](docs/AGILE_PLAN.md) - Original development plan (archived)
+
+### Current Development
+
+Phase documentation is tracked via GitHub Issues for active collaboration:
+
+- ✅ **Phases 0-17**: Complete (CLI + Web UI)
+- 🚧 **Phase 18**: Polish & Production Readiness (in progress)
+- 📋 **Future**: Performance optimization, advanced features
+
+See [scripts/MIGRATION_SUMMARY.md](scripts/MIGRATION_SUMMARY.md) for migration details.
+
+```bash
+# View all phase issues
+gh issue list --label phase
+
+# View CLI-specific phases
+gh issue list --label cli
+
+# View Web App phases
+gh issue list --label webapp
+```
+
+### Contributing
+
+1. Pick an open issue from [GitHub Issues](https://github.com/briantani/local-rlm/issues)
+2. Comment to claim the issue
+3. Create a branch: `git checkout -b feature/phase-X`
+4. Make changes with tests
+5. Submit PR linking to the issue
 
 ---
 

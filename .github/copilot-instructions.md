@@ -266,7 +266,7 @@ Training data lives in `src/optimization/data.py`. Key principles:
 
 ### Phased Development
 
-- Follow `AGILE_PLAN.md` strictly. Do NOT implement features from future phases.
+- Follow GitHub Issues strictly. Phase planning documented in `docs/AGILE_PLAN.md` (archived). Do NOT implement features from future phases.
 - Current phase is tracked in the plan. Check before adding new features.
 
 ### Thread Safety (Python 3.14t Specific)

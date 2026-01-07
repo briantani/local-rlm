@@ -48,6 +48,17 @@
                 </button>
 
                 <button
+                    @click="exportPDF()"
+                    class="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded text-sm transition flex items-center space-x-1"
+                    title="Export as PDF"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span>PDF</span>
+                </button>
+
+                <button
                     @click="shareTask()"
                     class="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded text-sm transition flex items-center space-x-1"
                     title="Share this result"
@@ -267,6 +278,28 @@ function canvasViewer(initialResult, initialTaskId) {
             } catch (e) {
                 console.error('JSON export failed:', e);
                 alert('Failed to export to JSON');
+            }
+        },
+
+        async exportPDF() {
+            if (!this.taskId) return;
+
+            try {
+                const response = await fetch(`/api/tasks/${this.taskId}/export/pdf`);
+                if (!response.ok) throw new Error('Export failed');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `task_${this.taskId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (e) {
+                console.error('PDF export failed:', e);
+                alert('Failed to export to PDF');
             }
         },
 

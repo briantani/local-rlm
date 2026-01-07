@@ -209,3 +209,4 @@ logs/
 *.log
 *.db
 data/
+scripts/

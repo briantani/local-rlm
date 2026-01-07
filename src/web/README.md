@@ -174,30 +174,26 @@ Frontend dependencies (CDN):
 - HTMX 2.x
 - Alpine.js 3.x
 
-## 🚧 Future Enhancements (Phase 16+)
+## ✅ Completed Features
 
-- [ ] Chat interface for follow-up queries
-- [ ] Task history viewer with search
-- [ ] Export results to file
-- [ ] Real-time collaboration features
+All web application features from [Phase 12-17](https://github.com/briantani/local-rlm/milestone/2) are complete:
 
-## ✅ Phase 15 Complete - Configuration Management
+- ✅ **Phase 12**: Service layer refactoring ([#13](https://github.com/briantani/local-rlm/issues/13))
+- ✅ **Phase 13**: FastAPI backend with WebSocket streaming ([#14](https://github.com/briantani/local-rlm/issues/14))
+- ✅ **Phase 14**: HTMX + Alpine.js UI ([#15](https://github.com/briantani/local-rlm/issues/15))
+- ✅ **Phase 15**: Configuration management UI ([#16](https://github.com/briantani/local-rlm/issues/16))
+- ✅ **Phase 16**: Chat interface for follow-up queries ([#17](https://github.com/briantani/local-rlm/issues/17))
+- ✅ **Phase 17**: Canvas & export features (Markdown/JSON/PDF, share links, templates) ([#18](https://github.com/briantani/local-rlm/issues/18))
 
-New pages added:
+## 🚧 In Progress
 
-- `/configs` - Configuration list with search and filtering
-- `/configs/{name}` - Detailed configuration view with YAML
-- `/configs/compare` - Side-by-side comparison (2-3 configs)
-- `/configs/estimate` - Interactive cost estimator
-
-Features:
-
-- Search configurations by name/description
-- Filter by provider (local/gemini/openai/hybrid)
-- Select up to 3 configs for comparison
-- View full YAML configuration with copy button
-- Module breakdown table
-- Interactive cost calculator with complexity slider
+- **Phase 18**: Polish & Production Readiness ([#19](https://github.com/briantani/local-rlm/issues/19))
+  - Error handling improvements
+  - Loading states and feedback
+  - Mobile responsiveness
+  - Documentation updates
+  - Docker containerization
+  - Rate limiting
 - Token usage estimates
 - Smart recommendations based on cost and quality
 

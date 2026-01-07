@@ -294,5 +294,6 @@ uv run python src/main.py "$TASK" --config configs/hybrid.yaml
 ## 📚 Further Reading
 
 - [RLM Paper (arXiv:2512.24601v1)](https://arxiv.org/html/2512.24601v1)
-- [AGILE_PLAN.md - Phase 11](../AGILE_PLAN.md)
+- [GitHub Issue #12 - Phase 11: Configuration Profiles](https://github.com/briantani/local-rlm/issues/12)
+- [docs/AGILE_PLAN.md](../docs/AGILE_PLAN.md) - Archived development plan
 - [Main README](../README.md)
