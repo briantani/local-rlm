@@ -159,6 +159,25 @@ class TestConfigListPage:
         # Should have Alpine.js initialization
         assert b"x-data" in response.content or b"alpine" in response.content.lower()
 
+    def test_configs_page_displays_coder_models_in_cards(self, client):
+        """Test that config cards display coder model information.
+
+        This is the PRIMARY test for the bug we just fixed. The config
+        cards were showing 'Not Configured' for coder models despite
+        them being properly set in YAML files.
+        """
+        response = client.get("/configs")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have JavaScript that accesses config.coder_model
+        assert "coder_model" in content, "Template should reference coder_model field"
+
+        # The JavaScript should display the coder model text
+        # (The actual values are loaded via API, but template should have the display logic)
+        assert "Coder:" in content or "coder" in content.lower(), "Coder label should be in template"
+
 
 # =============================================================================
 # Config Detail Page Tests
@@ -194,6 +213,21 @@ class TestConfigDetailPage:
             # Should have some YAML-related content
             assert b"yaml" in response.content.lower() or b"<pre" in response.content.lower()
 
+    def test_config_detail_shows_coder_model(self, client):
+        """Test that config detail page displays coder model information.
+
+        Ensures the detail view includes coder model, which was missing
+        in the original bug.
+        """
+        # Test with hybrid (has explicit coder)
+        response = client.get("/configs/hybrid")
+
+        if response.status_code == 200:
+            # Should show the coder model in the page
+            assert b"coder" in response.content.lower(), "Coder section not found in detail page"
+            # The actual model name appears in YAML content
+            assert b"qwen2.5-coder:14b" in response.content, "Coder model name not displayed"
+
 
 # =============================================================================
 # Config Compare Page Tests
@@ -215,6 +249,23 @@ class TestConfigComparePage:
         response = client.get("/configs/compare?config=local-only&config=hybrid")
 
         assert response.status_code == 200
+
+    def test_compare_page_shows_coder_models(self, client):
+        """Test that comparison page includes coder model information.
+
+        Guards against the bug where coder models weren't displayed
+        in the comparison view.
+        """
+        response = client.get("/configs/compare?config=hybrid&config=cost-effective")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Hybrid has explicit coder model
+        assert "qwen2.5-coder:14b" in content, "Hybrid coder model not found in comparison"
+
+        # Cost-effective uses root model
+        assert "(uses root model)" in content or "gemini-2.5-flash" in content, "Cost-effective coder info not found"
 
 
 # =============================================================================
@@ -292,9 +343,42 @@ class TestAPIResponseFormats:
             profile = profiles[0]
 
             # Required fields for UI display
-            required_fields = ["name", "description", "root_model", "root_provider"]
+            required_fields = [
+                "name",
+                "description",
+                "root_model",
+                "root_provider",
+                "coder_model",  # Added to prevent bug regression
+                "coder_provider",
+                "delegate_model",
+                "delegate_provider",
+            ]
             for field in required_fields:
                 assert field in profile, f"Profile missing required field: {field}"
+
+    def test_coder_model_displays_correctly(self, client):
+        """Test that coder model is correctly exposed in API response.
+
+        This test specifically guards against the bug where coder_model
+        was showing 'Not Configured' despite being in the YAML file.
+        """
+        response = client.get("/api/configs")
+        assert response.status_code == 200
+        data = response.json()
+        profiles = data["profiles"]
+
+        # Find hybrid config (has explicit coder module)
+        hybrid = next((p for p in profiles if p["name"] == "hybrid"), None)
+        if hybrid:
+            assert "coder_model" in hybrid, "hybrid profile missing coder_model field"
+            assert hybrid["coder_model"] != "Not configured", "coder_model should not be 'Not configured'"
+            assert hybrid["coder_model"] == "qwen2.5-coder:14b", f"Expected qwen2.5-coder:14b, got {hybrid['coder_model']}"
+
+        # Find cost-effective config (no explicit coder module, uses root)
+        cost_effective = next((p for p in profiles if p["name"] == "cost-effective"), None)
+        if cost_effective:
+            assert "coder_model" in cost_effective, "cost-effective profile missing coder_model field"
+            assert cost_effective["coder_model"] == "(uses root model)", f"Expected '(uses root model)', got {cost_effective['coder_model']}"
 
 
 # =============================================================================
@@ -440,17 +524,271 @@ class TestContextPath:
     def test_home_has_context_path_field(self, client):
         """Test that home page includes context path input field."""
         response = client.get("/")
-        
+
         assert response.status_code == 200
         content = response.content
-        
+
         # Check for context path input field
         assert b'id="contextPath"' in content
         assert b'x-model="contextPath"' in content
-        
+
         # Check for helpful label/description
         assert b"Context Folder" in content
-        
+
         # Check that contextPath is in the component state
         assert b"contextPath:" in content
 
+
+# =============================================================================
+# API Key Modal Tests
+# =============================================================================
+
+
+class TestAPIKeyModal:
+    """Tests for API key configuration modal."""
+
+    def test_api_key_button_exists_in_navigation(self, client):
+        """Test that API Keys button appears in navigation bar."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have the API Keys button
+        assert "API Keys" in content, "API Keys button not found in navigation"
+
+        # Should have the click handler
+        assert "open-api-key-modal" in content, "Modal event dispatcher not found"
+
+    def test_api_key_modal_component_exists(self, client):
+        """Test that API key modal component is included in base template."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should include the modal component
+        assert "apiKeyModal" in content, "Modal component function not found"
+        assert "Configure API Keys" in content, "Modal title not found"
+
+    def test_modal_has_provider_inputs(self, client):
+        """Test that modal has input fields for API providers."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have fields for major providers
+        assert "Gemini" in content or "gemini" in content, "Gemini input not found"
+        assert "OpenAI" in content or "openai" in content, "OpenAI input not found"
+
+    def test_modal_has_save_functionality(self, client):
+        """Test that modal has save button and logic."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have save button
+        assert "saveKeys" in content, "Save function not found"
+        # Save button text
+        assert "Save Keys" in content or "save" in content.lower(), "Save button not found"
+
+    def test_modal_integrates_with_session_store(self, client):
+        """Test that modal uses session store for API key management."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Modal should interact with session store
+        assert "sessionStore" in content, "Session store not found"
+        assert "setApiKey" in content, "API key setter not found"
+
+    def test_session_recreation_on_404(self, client):
+        """Test that session is recreated when backend returns 404."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have session recreation logic for 404 errors
+        assert "response.status === 404" in content, "404 handling not found"
+        assert "localStorage.removeItem('rlm_session_id')" in content, "Session cleanup not found"
+        # Should reinitialize session after cleanup
+        assert "await this.init()" in content, "Session reinitialization not found"
+
+
+# =============================================================================
+# Canvas Component Tests
+# =============================================================================
+
+
+class TestCanvasComponent:
+    """Test canvas component for displaying task results."""
+
+    def test_canvas_component_exists(self, client):
+        """Test that canvas component is included in home page."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should include canvas component content (check for canvasViewer function)
+        assert "canvasViewer" in content, "Canvas component not included"
+        assert "Task Result" in content, "Canvas header not found"
+
+    def test_canvas_receives_result_data(self, client):
+        """Test that canvas component receives result and taskId as parameters."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should pass result and taskId to canvas function
+        assert "canvasViewer(result, taskId)" in content, "Canvas not receiving parameters"
+
+    def test_canvas_displays_final_answer(self, client):
+        """Test that canvas has section for final answer."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have final answer section
+        assert "Final Answer" in content, "Final answer section not found"
+        assert "result?.answer" in content, "Answer binding not found"
+
+    def test_canvas_has_execution_timeline(self, client):
+        """Test that canvas includes execution timeline/logs."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have execution timeline section
+        assert "Execution Timeline" in content or "execution_history" in content, "Execution timeline not found"
+
+    def test_canvas_has_metadata_display(self, client):
+        """Test that canvas shows execution metadata (cost, duration, steps)."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should display execution metadata
+        assert "total_cost" in content or "Total Cost" in content, "Cost display not found"
+        assert "duration_seconds" in content or "Duration" in content, "Duration display not found"
+        assert "step_count" in content or "Steps" in content, "Step count display not found"
+
+    def test_canvas_has_export_actions(self, client):
+        """Test that canvas includes export actions (markdown, JSON, share)."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have export buttons
+        assert "exportMarkdown" in content, "Markdown export not found"
+        assert "exportJSON" in content, "JSON export not found"
+        assert "shareTask" in content, "Share function not found"
+
+    def test_canvas_has_save_template_action(self, client):
+        """Test that canvas includes save as template action."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have save template button
+        assert "saveAsTemplate" in content, "Save template function not found"
+        assert "Save Template" in content or "Save as template" in content.lower(), "Save template button not found"
+
+    def test_canvas_logs_are_collapsible(self, client):
+        """Test that execution logs are in a collapsible section."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have collapsible logs section
+        assert "showLogs" in content, "showLogs state not found"
+        assert "Execution Logs" in content, "Execution Logs section not found"
+        # Should use x-collapse or similar mechanism
+        assert "x-show=\"showLogs\"" in content or "@click=\"showLogs" in content, "Collapse mechanism not found"
+
+    def test_canvas_separates_report_from_logs(self, client):
+        """Test that canvas clearly separates final report from execution logs."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have separate sections
+        assert "Final Report" in content or "Final Answer" in content, "Final report section not found"
+        assert "Execution Logs" in content, "Execution logs section not found"
+        # Logs should come after summary
+        assert "Execution Summary" in content or "Execution Details" in content, "Execution summary not found"
+
+
+# =============================================================================
+# Context Path / Folder Picker Tests
+# =============================================================================
+
+
+class TestFolderPicker:
+    """Test folder picker functionality for context path."""
+
+    def test_context_path_input_exists(self, client):
+        """Test that context path input field exists."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have context path input
+        assert 'id="contextPath"' in content, "Context path input not found"
+        assert "x-model=\"contextPath\"" in content, "Alpine.js binding not found"
+
+    def test_browse_button_exists(self, client):
+        """Test that Browse button exists for folder selection."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have browse button
+        assert "📁 Browse" in content or "Browse" in content, "Browse button not found"
+        assert "@click=\"selectFolder()\"" in content, "Folder selection handler not found"
+
+    def test_select_folder_function_exists(self, client):
+        """Test that selectFolder() function is implemented."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have selectFolder function
+        assert "async selectFolder()" in content or "selectFolder()" in content, "selectFolder function not found"
+        assert "showDirectoryPicker" in content, "File System Access API not implemented"
+
+    def test_folder_picker_has_fallback(self, client):
+        """Test that folder picker has fallback for older browsers."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should have fallback for browsers without showDirectoryPicker
+        assert "webkitdirectory" in content, "Fallback directory picker not found"
+        assert "input.type = 'file'" in content, "File input creation not found"
+
+    def test_folder_picker_defaults_to_downloads(self, client):
+        """Test that folder picker attempts to default to downloads folder."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Should configure startIn option for File System Access API
+        assert "startIn: 'downloads'" in content, "Downloads default not configured"

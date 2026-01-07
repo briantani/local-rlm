@@ -49,6 +49,18 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <!-- API Key Config Button -->
+                    <button
+                        @click="$dispatch('open-api-key-modal', { providers: ['Gemini', 'OpenAI'] })"
+                        class="text-sm px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 transition flex items-center space-x-1"
+                        title="Configure API Keys"
+                    >
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                        <span>API Keys</span>
+                    </button>
+
                     <div x-data class="text-sm text-gray-600">
                         Session: <span class="font-mono text-xs" x-text="$store.sessionStore.sessionId ? $store.sessionStore.sessionId.slice(0, 8) : 'Loading...'"></span>
                     </div>
@@ -114,6 +126,10 @@
 
                     if (response.ok) {
                         this.apiKeys = await response.json();
+                    } else if (response.status === 404) {
+                        // Session no longer exists, recreate it
+                        localStorage.removeItem('rlm_session_id');
+                        await this.init();
                     }
                 },
 
@@ -132,6 +148,12 @@
                     if (response.ok) {
                         await this.checkApiKeys();
                         return true;
+                    } else if (response.status === 404) {
+                        // Session no longer exists (server restarted), recreate it
+                        localStorage.removeItem('rlm_session_id');
+                        await this.init();
+                        // Retry setting the API key with new session
+                        return await this.setApiKey(provider, key);
                     }
                     return false;
                 },
@@ -148,6 +170,9 @@
             Alpine.store('sessionStore').init();
         });
     </script>
+
+    <!-- API Key Modal Component (Global) -->
+    {% include 'components/api_key_modal.html' %}
 
     {% block scripts %}{% endblock %}
 </body>

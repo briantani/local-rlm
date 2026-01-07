@@ -27,6 +27,8 @@ class ProfileSummaryResponse(BaseModel):
     root_provider: str
     delegate_model: str
     delegate_provider: str
+    coder_model: str
+    coder_provider: str
     max_budget: float
     max_steps: int
     max_depth: int
@@ -45,6 +47,8 @@ class ProfileSummaryResponse(BaseModel):
             root_provider=summary.root_provider,
             delegate_model=summary.delegate_model,
             delegate_provider=summary.delegate_provider,
+            coder_model=summary.coder_model,
+            coder_provider=summary.coder_provider,
             max_budget=summary.max_budget,
             max_steps=summary.max_steps,
             max_depth=summary.max_depth,
@@ -118,6 +122,8 @@ async def get_profile(
         root_provider=summary.root_provider,
         delegate_model=summary.delegate_model,
         delegate_provider=summary.delegate_provider,
+        coder_model=summary.coder_model,
+        coder_provider=summary.coder_provider,
         max_budget=summary.max_budget,
         max_steps=summary.max_steps,
         max_depth=summary.max_depth,

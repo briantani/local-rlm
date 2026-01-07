@@ -164,30 +164,31 @@ class TaskService:
 
         # Track execution history for callbacks
         execution_history: list[StepInfo] = []
-        original_history_append = agent.history.append
         step_counter = [0]  # Use list for closure mutability
 
-        def tracked_append(item: tuple[str, str]):
+        # Store the original _add_history method
+        original_add_history = agent._add_history
+
+        def tracked_add_history(action: str, output: str):
             """Wrapper to track history additions and call callback."""
-            original_history_append(item)
+            # Call original method to add to history
+            original_add_history(action, output)
             step_counter[0] += 1
 
-            action_or_code, output = item
-
             # Determine action type
-            if action_or_code.startswith("Executed Code"):
-                action = "CODE"
-            elif "Delegated" in action_or_code or "DELEGATE" in action_or_code:
-                action = "DELEGATE"
-            elif "System" in action_or_code:
-                action = "INIT"
+            if action.startswith("Executed Code"):
+                action_type = "CODE"
+            elif "Delegated" in action or "DELEGATE" in action:
+                action_type = "DELEGATE"
+            elif "System" in action:
+                action_type = "INIT"
             else:
-                action = "OTHER"
+                action_type = "OTHER"
 
             step_info = StepInfo(
                 step_number=step_counter[0],
-                action=action,
-                input_text=action_or_code,
+                action=action_type,
+                input_text=action,
                 output_text=output,
             )
             execution_history.append(step_info)
@@ -198,8 +199,8 @@ class TaskService:
                 except Exception as e:
                     logger.warning(f"Step callback error: {e}")
 
-        # Monkey-patch the history append method
-        agent.history.append = tracked_append  # type: ignore
+        # Replace the _add_history method with our tracked version
+        agent._add_history = tracked_add_history  # type: ignore
 
         # Run task
         answer = agent.run(task)

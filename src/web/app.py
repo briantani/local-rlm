@@ -75,10 +75,10 @@ def create_app() -> FastAPI:
 
     # Import chat, export, and share routers
     from src.web.routes import chat, export, share, templates
-    app.include_router(chat.router, tags=["Chat"])
-    app.include_router(export.router, tags=["Export"])
-    app.include_router(share.router, tags=["Share"])
-    app.include_router(templates.router, tags=["Templates"])
+    app.include_router(chat.router)
+    app.include_router(export.router)
+    app.include_router(share.router)
+    app.include_router(templates.router)
 
     # Mount static files (for Phase 14)
     static_path = Path(__file__).parent / "static"
@@ -117,24 +117,34 @@ def create_app() -> FastAPI:
         configs_data = []
         for name in config_names:
             try:
-                config_obj = services.config_service.get_profile(name)
-                if config_obj:
-                    # Enhance with metadata
-                    profile_dict = config_obj.dict()
-                    profile_dict["name"] = name
-
-                    # Get root and coder models
-                    profile_dict["root_model"] = profile_dict.get("root", {}).get("model", "Unknown")
-                    profile_dict["coder_model"] = profile_dict.get("modules", {}).get("coder", {}).get("model", "Unknown")
-                    profile_dict["delegate_model"] = profile_dict.get("delegate", {}).get("model", None)
+                summary = services.config_service.get_profile_summary(name)
+                if summary:
+                    # Get required providers
+                    required_providers = summary.get_required_providers()
 
                     # Estimate cost
-                    provider = "local" if not config_obj.required_providers else "cloud"
-                    if provider == "local":
-                        profile_dict["cost_estimate"] = "Free"
+                    if not required_providers:
+                        cost_estimate = "Free"
                     else:
-                        profile_dict["cost_estimate"] = "~$0.02/task"
+                        root_model = summary.root_model.lower() if summary.root_model else ""
+                        if "flash" in root_model:
+                            cost_estimate = "~$0.01/task"
+                        elif "pro" in root_model:
+                            cost_estimate = "~$0.05/task"
+                        elif "gpt-4" in root_model:
+                            cost_estimate = "~$0.10/task"
+                        else:
+                            cost_estimate = "~$0.02/task"
 
+                    profile_dict = {
+                        "name": name,
+                        "description": summary.description,
+                        "root_model": summary.root_model,
+                        "coder_model": summary.coder_model,
+                        "delegate_model": summary.delegate_model,
+                        "required_providers": required_providers,
+                        "cost_estimate": cost_estimate,
+                    }
                     configs_data.append(profile_dict)
             except Exception as e:
                 logger.warning(f"Failed to load config {name}: {e}")
@@ -168,15 +178,19 @@ def create_app() -> FastAPI:
             if config_path.exists():
                 yaml_content = config_path.read_text()
 
+            # Get summary for required providers
+            summary = services.config_service.get_profile_summary(name)
+            required_providers = summary.get_required_providers() if summary else []
+
             # Prepare config data
             profile_dict = asdict(config)
             profile_dict["name"] = name
             profile_dict["root_model"] = profile_dict.get("root", {}).get("model", "Unknown")
             profile_dict["coder_model"] = profile_dict.get("modules", {}).get("coder", {}).get("model", "Unknown")
             profile_dict["delegate_model"] = profile_dict.get("delegate", {}).get("model", None)
+            profile_dict["required_providers"] = required_providers
 
             # Estimate cost
-            required_providers = services.config_service.get_required_providers(name)
             provider = "local" if not required_providers else "cloud"
             if provider == "local":
                 profile_dict["cost_estimate"] = "Free"

@@ -6,7 +6,8 @@ Handles async task execution with event streaming for WebSocket updates.
 
 import asyncio
 import logging
-from collections import defaultdict
+import threading
+import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -52,10 +53,10 @@ class TaskUpdate:
 
 # Global task update queues (in-memory pub/sub)
 # Maps task_id -> list of asyncio.Queue for subscribers
-task_updates: dict[str, list[asyncio.Queue]] = defaultdict(list)
+task_updates: dict[str, list[asyncio.Queue]] = {}
 
-# Lock for thread-safe access to task_updates
-_updates_lock = asyncio.Lock()
+# Lock for thread-safe access to task_updates (using threading.Lock for Python 3.14t compatibility)
+_updates_lock = threading.Lock()
 
 
 async def subscribe(task_id: str) -> AsyncGenerator[TaskUpdate, None]:
@@ -72,7 +73,9 @@ async def subscribe(task_id: str) -> AsyncGenerator[TaskUpdate, None]:
     """
     queue: asyncio.Queue = asyncio.Queue()
 
-    async with _updates_lock:
+    with _updates_lock:
+        if task_id not in task_updates:
+            task_updates[task_id] = []
         task_updates[task_id].append(queue)
 
     try:
@@ -84,11 +87,11 @@ async def subscribe(task_id: str) -> AsyncGenerator[TaskUpdate, None]:
             if update.type in (UpdateType.COMPLETE, UpdateType.ERROR):
                 break
     finally:
-        async with _updates_lock:
-            if queue in task_updates[task_id]:
+        with _updates_lock:
+            if task_id in task_updates and queue in task_updates[task_id]:
                 task_updates[task_id].remove(queue)
             # Cleanup empty lists
-            if not task_updates[task_id]:
+            if task_id in task_updates and not task_updates[task_id]:
                 del task_updates[task_id]
 
 
@@ -100,10 +103,12 @@ async def publish(task_id: str, update: TaskUpdate):
         task_id: The task ID
         update: The update to publish
     """
-    async with _updates_lock:
-        queues = task_updates.get(task_id, [])
-        for queue in queues:
-            await queue.put(update)
+    with _updates_lock:
+        queues = task_updates.get(task_id, []).copy()  # Make a copy to avoid iteration issues
+
+    # Put updates without holding the lock
+    for queue in queues:
+        await queue.put(update)
 
 
 async def run_task_async(
@@ -135,13 +140,15 @@ async def run_task_async(
             data={"status": "running"},
         ))
 
+        # Get the current event loop
+        loop = asyncio.get_event_loop()
+
         # Define callback for step updates
         def on_step(step_info: StepInfo):
-            # Schedule the async publish in the event loop
-            asyncio.create_task(_publish_step(task_id, step_info))
+            # Schedule the async publish in the event loop from the thread
+            asyncio.run_coroutine_threadsafe(_publish_step(task_id, step_info), loop)
 
         # Run the task in a thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None,
             lambda: task_service.run_task(
@@ -184,6 +191,7 @@ async def run_task_async(
 
     except Exception as e:
         logger.error(f"Task {task_id} failed: {e}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
         error_data = {
             "error": str(e),

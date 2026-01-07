@@ -4,7 +4,7 @@ Templates API routes for the RLM web interface.
 Provides endpoints for creating, listing, and applying task templates.
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.web.database import (
@@ -14,7 +14,7 @@ from src.web.database import (
     list_templates,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/api/templates")
 
 
 class CreateTemplateRequest(BaseModel):
@@ -35,50 +35,42 @@ class ApplyTemplateResponse(BaseModel):
     context_path: str | None
 
 
-@router.post("/api/templates")
-async def create_template_endpoint(request: Request, body: CreateTemplateRequest):
+@router.post("")
+async def create_template_endpoint(body: CreateTemplateRequest):
     """
     Create a new task template.
 
     Args:
-        request: FastAPI request object (for session)
         body: Template creation data
 
     Returns:
         Created template as JSON
     """
-    # Get session ID if user is logged in (optional)
-    session_id = request.session.get("session_id")
-
     template = await create_template(
         name=body.name,
         description=body.description,
         task_template=body.task_text,
         config_name=body.config_name,
         context_path=body.context_path,
-        session_id=session_id,
+        session_id=None,  # Templates are global, not session-specific
     )
 
     return template.to_dict()
 
 
-@router.get("/api/templates")
-async def list_templates_endpoint(request: Request):
+@router.get("")
+async def list_templates_endpoint():
     """
     List all available templates.
-
-    Args:
-        request: FastAPI request object (for session filtering)
 
     Returns:
         List of templates as JSON
     """
-    session_id = request.session.get("session_id")
-    templates = await list_templates(session_id=session_id)
+    templates = await list_templates(session_id=None)
     return [t.to_dict() for t in templates]
 
 
-@router.get("/api/templates/{template_id}")
+@router.get("/{template_id}")
 async def get_template_endpoint(template_id: int):
     """
     Get a specific template by ID.
@@ -99,7 +91,7 @@ async def get_template_endpoint(template_id: int):
     return template.to_dict()
 
 
-@router.post("/api/templates/{template_id}/apply")
+@router.post("/{template_id}/apply")
 async def apply_template_endpoint(template_id: int) -> ApplyTemplateResponse:
     """
     Apply a template, returning its configuration for use.
@@ -124,7 +116,7 @@ async def apply_template_endpoint(template_id: int) -> ApplyTemplateResponse:
     )
 
 
-@router.delete("/api/templates/{template_id}")
+@router.delete("/{template_id}")
 async def delete_template_endpoint(template_id: int):
     """
     Delete a template.

@@ -93,11 +93,11 @@
                     <div class="space-y-2">
                         <div class="flex items-center text-sm">
                             <span class="text-gray-500 w-20">Root:</span>
-                            <span class="text-gray-900 font-mono text-xs" x-text="config.root_model"></span>
+                            <span class="text-gray-900 font-mono text-xs" x-text="config.root_model || 'Not configured'"></span>
                         </div>
                         <div class="flex items-center text-sm">
                             <span class="text-gray-500 w-20">Coder:</span>
-                            <span class="text-gray-900 font-mono text-xs" x-text="config.coder_model"></span>
+                            <span class="text-gray-900 font-mono text-xs" x-text="config.coder_model || 'Not configured'"></span>
                         </div>
                     </div>
 
@@ -219,8 +219,15 @@ function configsManager() {
                 // Enhance config data with provider type and cost estimate
                 this.configs = profilesList.map(config => {
                     const provider = this.detectProvider(config);
+
+                    // Extract coder model from modules if not at top level
+                    const coderModel = config.coder_model ||
+                                      (config.modules?.coder?.model) ||
+                                      'Not configured';
+
                     return {
                         ...config,
+                        coder_model: coderModel,
                         provider,
                         cost_estimate: this.estimateCost(config)
                     };

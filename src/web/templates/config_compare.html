@@ -177,7 +177,8 @@
             {% if configs|selectattr('cost_estimate', 'equalto', 'Free')|list|length > 0 %}
             <p><strong>For cost-conscious users:</strong> Choose {{ configs|selectattr('cost_estimate', 'equalto', 'Free')|map(attribute='name')|first }} for completely free operation using local models.</p>
             {% endif %}
-            {% if configs|selectattr('required_providers', 'defined')|selectattr('required_providers', 'length', 0)|list|length == 0 %}
+            {% set free_configs = configs|selectattr('required_providers')|selectattr('required_providers', 'equalto', [])|list %}
+            {% if free_configs|length == 0 %}
             <p class="mt-2"><strong>For best quality:</strong> Cloud-based configurations typically provide better performance at the cost of API usage.</p>
             {% endif %}
         </div>

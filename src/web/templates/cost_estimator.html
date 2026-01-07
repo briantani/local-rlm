@@ -209,9 +209,16 @@ function costEstimator() {
                 const response = await fetch('/api/configs');
                 const data = await response.json();
                 // Handle both array and {profiles: [...], count: ...} response formats
-                this.configs = data.profiles || data;
+                const profilesList = data.profiles || data;
+
+                // Enhance configs with coder_model if missing
+                this.configs = profilesList.map(config => ({
+                    ...config,
+                    coder_model: config.coder_model || config.modules?.coder?.model || 'Unknown'
+                }));
             } catch (e) {
                 console.error('Failed to load configs:', e);
+                this.configs = [];
             }
         },
 

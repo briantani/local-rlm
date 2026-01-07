@@ -1,4 +1,5 @@
 import concurrent.futures
+import threading
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -81,6 +82,8 @@ class RLMAgent:
         self.responder = responder if responder else Responder()
         self.delegator = delegator if delegator else Delegator()
 
+        # Thread-safe history tracking (Python 3.14t compatibility)
+        self._history_lock = threading.Lock()
         self.history: list[tuple[str, str]] = []  # List of (Action/Code, Output)
 
         # Initialize context with file listing if root_dir is provided
@@ -90,14 +93,20 @@ class RLMAgent:
                 f"AVAILABLE FILES (Use Python code to read them):\n{file_structure}\n"
                 f"NOTE: To access file content, you MUST generate Python code using open(), pd.read_csv(), etc."
             )
-            self.history.append(("System Initialization", initial_context))
+            self._add_history("System Initialization", initial_context)
+
+    def _add_history(self, action: str, output: str) -> None:
+        """Thread-safe history append for Python 3.14t compatibility."""
+        with self._history_lock:
+            self.history.append((action, output))
 
     def format_context(self) -> str:
         """Formats the execution history into a string context."""
-        if not self.history:
-            return ""
+        with self._history_lock:
+            if not self.history:
+                return ""
 
-        context_str = "Execution History:\n"
+            context_str = "Execution History:\n"
         for i, (action_or_code, output) in enumerate(self.history, 1):
             context_str += f"--- Step {i} ---\n"
             context_str += f"Input: {action_or_code}\n"
@@ -145,19 +154,19 @@ class RLMAgent:
                     log_msg = f"{indent}Execution Output (truncated): {output[:100]}..." if len(output) > 100 else f"{indent}Execution Output: {output}"
                     logger.info(log_msg)
 
-                    self.history.append((f"Executed Code:\n{code}", output))
+                    self._add_history(f"Executed Code:\n{code}", output)
 
                 except Exception as e:
                     error_msg = f"Error during coding/execution: {e}"
                     logger.error(f"{indent}{error_msg}")
-                    self.history.append(("Attempted Code Generation", error_msg))
+                    self._add_history("Attempted Code Generation", error_msg)
 
             elif action == "DELEGATE":
                 if self.depth >= self.max_depth:
                     logger.warning(f"{indent}Max depth reached. Cannot delegate further. Returning to Answer mode.")
                     # Force answer in next step or use responder now?
                     # Let's add instruction to history to guide Architect
-                    self.history.append(("Action: DELEGATE", "FAILED: Max recursion saturation reached. You must solve this yourself using CODE or ANSWER."))
+                    self._add_history("Action: DELEGATE", "FAILED: Max recursion saturation reached. You must solve this yourself using CODE or ANSWER.")
                     continue
 
                 logger.info(f"{indent}Delegating task...")
@@ -168,7 +177,7 @@ class RLMAgent:
 
                     if not subtasks:
                         logger.warning(f"{indent}No subtasks found. Aborting delegation.")
-                        self.history.append(("Action: DELEGATE", "FAILED: Could not split task."))
+                        self._add_history("Action: DELEGATE", "FAILED: Could not split task.")
                         continue
 
                     # 2. Execute in parallel
@@ -200,11 +209,11 @@ class RLMAgent:
                     # 3. Aggregate results into history
                     combined_results = "\n".join(results)
                     logger.info(f"{indent}Delegation Complete. Results:\n{combined_results}")
-                    self.history.append((f"Delegated Subtasks: {subtasks}", f"Results from sub-agents:\n{combined_results}"))
+                    self._add_history(f"Delegated Subtasks: {subtasks}", f"Results from sub-agents:\n{combined_results}")
 
                 except Exception as e:
                     logger.error(f"{indent}Delegation error: {e}")
-                    self.history.append(("Action: DELEGATE", f"Error: {e}"))
+                    self._add_history("Action: DELEGATE", f"Error: {e}")
 
             else:
                 logger.warning(f"{indent}Unknown action: {action}")

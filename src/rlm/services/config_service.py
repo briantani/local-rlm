@@ -35,6 +35,8 @@ class ProfileSummary:
     root_provider: str
     delegate_model: str
     delegate_provider: str
+    coder_model: str
+    coder_provider: str
     max_budget: float
     max_steps: int
     max_depth: int
@@ -42,17 +44,20 @@ class ProfileSummary:
     @property
     def requires_gemini(self) -> bool:
         """Check if profile requires Gemini API key."""
-        return "gemini" in self.root_provider.lower() or "gemini" in self.delegate_provider.lower()
+        providers = [self.root_provider.lower(), self.delegate_provider.lower(), self.coder_provider.lower()]
+        return any("gemini" in p for p in providers)
 
     @property
     def requires_openai(self) -> bool:
         """Check if profile requires OpenAI API key."""
-        return "openai" in self.root_provider.lower() or "openai" in self.delegate_provider.lower()
+        providers = [self.root_provider.lower(), self.delegate_provider.lower(), self.coder_provider.lower()]
+        return any("openai" in p for p in providers)
 
     @property
     def requires_ollama(self) -> bool:
         """Check if profile requires Ollama (local, no key needed)."""
-        return "ollama" in self.root_provider.lower() or "ollama" in self.delegate_provider.lower()
+        providers = [self.root_provider.lower(), self.delegate_provider.lower(), self.coder_provider.lower()]
+        return any("ollama" in p for p in providers)
 
     def get_required_providers(self) -> list[str]:
         """
@@ -62,8 +67,8 @@ class ProfileSummary:
             List of provider names (excludes ollama which is local)
         """
         providers = set()
-        for provider in [self.root_provider.lower(), self.delegate_provider.lower()]:
-            if provider != "ollama":
+        for provider in [self.root_provider.lower(), self.delegate_provider.lower(), self.coder_provider.lower()]:
+            if provider != "ollama" and provider != "unknown":
                 providers.add(provider)
         return list(providers)
 
@@ -144,6 +149,12 @@ class ConfigService:
             root = raw.get("root", {})
             delegate = raw.get("delegate", {})
             budget = raw.get("budget", {})
+            modules = raw.get("modules", {})
+            coder = modules.get("coder", {})
+
+            # If no coder module, use "(uses root model)" as display text
+            coder_model = coder.get("model", "(uses root model)")
+            coder_provider = coder.get("provider", root.get("provider", "unknown"))
 
             return ProfileSummary(
                 name=yaml_path.stem,
@@ -152,6 +163,8 @@ class ConfigService:
                 root_provider=root.get("provider", "unknown"),
                 delegate_model=delegate.get("model", "unknown"),
                 delegate_provider=delegate.get("provider", "unknown"),
+                coder_model=coder_model,
+                coder_provider=coder_provider,
                 max_budget=budget.get("max_usd", 1.0),
                 max_steps=root.get("max_steps", 10),
                 max_depth=root.get("max_depth", 3),

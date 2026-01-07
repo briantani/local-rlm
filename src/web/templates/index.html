@@ -22,7 +22,11 @@
                     class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     :disabled="isRunning"
                 >
-                    <option value="">Loading configs...</option>
+                    <option value="" x-show="configs.length === 0">Loading configs...</option>
+                    <option value="" x-show="configs.length > 0" disabled>Select a configuration...</option>
+                    <template x-for="config in configs" :key="config.name">
+                        <option :value="config.name" x-text="`${config.name} - ${config.description}`"></option>
+                    </template>
                 </select>
                 <p class="mt-1 text-sm text-gray-500" x-show="configDetails" x-cloak>
                     <span x-text="configDetails"></span>
@@ -81,14 +85,28 @@
                     Context Folder (Optional)
                     <span class="text-gray-500 text-xs">— Absolute path to folder with files the agent can access</span>
                 </label>
-                <input
-                    id="contextPath"
-                    x-model="contextPath"
-                    type="text"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., /Users/yourname/data or C:\\Projects\\data"
-                    :disabled="isRunning"
-                />
+                <div class="flex gap-2">
+                    <input
+                        id="contextPath"
+                        x-model="contextPath"
+                        type="text"
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        :placeholder="contextPathPlaceholder"
+                        :disabled="isRunning"
+                    />
+                    <button
+                        @click="selectFolder()"
+                        type="button"
+                        :disabled="isRunning"
+                        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md border border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        title="Browse to find folder name, then enter full path"
+                    >
+                        📁 Browse
+                    </button>
+                </div>
+                <div x-show="folderHint" x-transition class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p class="text-sm text-blue-800" x-html="folderHint"></p>
+                </div>
                 <p class="mt-1 text-xs text-gray-500">
                     💡 Agent can read files using Python code (e.g., <code class="bg-gray-100 px-1 rounded">pd.read_csv('data.csv')</code>).
                     Folder contents will be listed at the start of execution.
@@ -102,7 +120,7 @@
                     class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
                     :disabled="!canSubmit"
                 >
-                    <span x-show="!isRunning">▶️ Run Task</span>
+                    <span x-show="!isRunning" x-cloak>▶️ Run Task</span>
                     <span x-show="isRunning" x-cloak>⏳ Running...</span>
                 </button>
 
@@ -171,7 +189,7 @@
 
         <!-- Final Result - Canvas View -->
         <div x-show="result" x-cloak>
-            <div :data-result="JSON.stringify(result)" :data-task-id="taskId">
+            <div x-data="canvasViewer(result, taskId)">
                 {% include 'components/canvas.html' %}
             </div>
         </div>
@@ -214,9 +232,75 @@ function taskRunner() {
         // Task state
         taskText: '',
         contextPath: '',
+        contextPathPlaceholder: '',
+        folderHint: '',
         taskId: null,
         currentTaskId: null,  // For chat panel integration
         isRunning: false,
+
+        async selectFolder() {
+            try {
+                const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+                const isWindows = navigator.platform.toUpperCase().indexOf('WIN') >= 0;
+
+                // Try modern File System Access API first (Chrome/Edge)
+                if ('showDirectoryPicker' in window) {
+                    const dirHandle = await window.showDirectoryPicker({
+                        mode: 'read',
+                        startIn: 'downloads' // Defaults to downloads folder
+                    });
+
+                    const folderName = dirHandle.name;
+
+                    // Provide OS-specific path hints
+                    if (isMac) {
+                        this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Common Mac paths:</strong><br>• Downloads: <code>/Users/yourname/Downloads</code><br>• Documents: <code>/Users/yourname/Documents</code><br>• Desktop: <code>/Users/yourname/Desktop</code><br><em>Replace "yourname" with your username</em>`;
+                        // Try to be helpful - if it's Downloads, suggest the path
+                        if (folderName === 'Downloads') {
+                            this.contextPath = '/Users/' + (process.env.USER || 'yourname') + '/Downloads';
+                        }
+                    } else if (isWindows) {
+                        this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Common Windows paths:</strong><br>• Downloads: <code>C:\\Users\\yourname\\Downloads</code><br>• Documents: <code>C:\\Users\\yourname\\Documents</code><br>• Desktop: <code>C:\\Users\\yourname\\Desktop</code><br><em>Replace "yourname" with your username</em>`;
+                        if (folderName === 'Downloads') {
+                            this.contextPath = 'C:\\Users\\yourname\\Downloads';
+                        }
+                    } else {
+                        this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Linux path example:</strong> <code>/home/yourname/${folderName.toLowerCase()}</code>`;
+                    }
+
+                } else {
+                    // Fallback: show file input dialog
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.webkitdirectory = true;
+                    input.directory = true;
+
+                    input.onchange = (e) => {
+                        const files = e.target.files;
+                        if (files && files.length > 0) {
+                            const fullPath = files[0].webkitRelativePath || files[0].name;
+                            const folderName = fullPath.split('/')[0];
+
+                            if (isMac) {
+                                this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Enter full Mac path above</strong>, e.g.: <code>/Users/yourname/${folderName}</code>`;
+                            } else if (isWindows) {
+                                this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Enter full Windows path above</strong>, e.g.: <code>C:\\Users\\yourname\\${folderName}</code>`;
+                            } else {
+                                this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Enter full path above</strong>, e.g.: <code>/home/yourname/${folderName.toLowerCase()}</code>`;
+                            }
+                        }
+                    };
+
+                    input.click();
+                }
+            } catch (err) {
+                // User cancelled - don't show error
+                if (err.name !== 'AbortError') {
+                    console.error('Error selecting folder:', err);
+                    this.folderHint = '<strong>Error:</strong> Could not access folder picker. Please enter the path manually.';
+                }
+            }
+        },
 
         // Execution state
         steps: [],
@@ -227,6 +311,18 @@ function taskRunner() {
         ws: null,
 
         async init() {
+            // Detect OS for better path hints
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const isWindows = navigator.platform.toUpperCase().indexOf('WIN') >= 0;
+
+            if (isMac) {
+                this.contextPathPlaceholder = 'e.g., /Users/yourname/Downloads';
+            } else if (isWindows) {
+                this.contextPathPlaceholder = 'e.g., C:\\Users\\yourname\\Downloads';
+            } else {
+                this.contextPathPlaceholder = 'e.g., /home/yourname/downloads';
+            }
+
             await this.loadConfigs();
             await this.loadTemplates();
         },
@@ -239,19 +335,22 @@ function taskRunner() {
                 const configsList = data.profiles || data;
                 this.configs = configsList;
 
-                // Populate select options
-                const select = document.getElementById('config');
-                select.innerHTML = '<option value="">Select a configuration...</option>';
-                configsList.forEach(config => {
-                    const option = document.createElement('option');
-                    option.value = config.name;
-                    option.textContent = `${config.name} - ${config.description}`;
-                    select.appendChild(option);
-                });
+                // Check if there's a config in URL params
+                const urlParams = new URLSearchParams(window.location.search);
+                const configParam = urlParams.get('config');
 
-                // Select first config by default
-                if (data.length > 0) {
-                    this.selectedConfig = data[0].name;
+                // Try to find local-only config as default
+                const localOnlyConfig = configsList.find(c => c.name === 'local-only');
+
+                // Select config: URL param > local-only > first in list
+                if (configParam && configsList.some(c => c.name === configParam)) {
+                    this.selectedConfig = configParam;
+                    await this.onConfigChange();
+                } else if (localOnlyConfig) {
+                    this.selectedConfig = 'local-only';
+                    await this.onConfigChange();
+                } else if (configsList.length > 0) {
+                    this.selectedConfig = configsList[0].name;
                     await this.onConfigChange();
                 }
             } catch (e) {
@@ -298,13 +397,6 @@ function taskRunner() {
         },
 
         async onConfigChange() {
-                }
-            } catch (e) {
-                console.error('Failed to load configs:', e);
-            }
-        },
-
-        async onConfigChange() {
             if (!this.selectedConfig) return;
 
             try {
@@ -314,7 +406,7 @@ function taskRunner() {
                 this.configDetails = config.description;
                 this.requiredProviders = config.required_providers || [];
 
-                // Check if API keys are needed
+                // Check if API keys are needed (but don't prompt on initial load for local-only)
                 await this.checkApiKeys();
             } catch (e) {
                 console.error('Failed to load config details:', e);
@@ -324,6 +416,11 @@ function taskRunner() {
         async checkApiKeys() {
             const session = Alpine.store('sessionStore');
             await session.checkApiKeys();
+
+            // Don't show modal for local-only config (no API keys needed)
+            if (this.selectedConfig === 'local-only') {
+                return;
+            }
 
             // Check if required keys are missing
             const missingKeys = this.requiredProviders.filter(
