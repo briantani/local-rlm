@@ -49,6 +49,9 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
+markers = [
+    "integration: marks tests as integration tests (may require LLM or external services)",
+]
 filterwarnings = [
     "ignore:Pydantic serializer warnings:UserWarning",
     "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning"

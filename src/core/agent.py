@@ -10,6 +10,7 @@ from src.core.logger import logger
 from src.core.repl import PythonREPL
 from src.core.budget import BudgetManager
 from src.core.config_loader import ProfileConfig
+from src.core.context_summarizer import ContextSummarizer
 from src.modules.architect import Architect
 from src.modules.coder import Coder
 from src.modules.responder import Responder
@@ -96,6 +97,9 @@ class RLMAgent:
         self.responder = responder if responder else Responder(run_context=run_context)
         self.delegator = delegator if delegator else Delegator()
 
+        # Context summarizer for RAG-like handling of large contexts
+        self.context_summarizer = ContextSummarizer(run_context=run_context)
+
         # Thread-safe history tracking (Python 3.14t compatibility)
         self._history_lock = threading.Lock()
         self.history: list[tuple[str, str]] = []  # List of (Action/Code, Output)
@@ -126,6 +130,98 @@ class RLMAgent:
         """Thread-safe history append for Python 3.14t compatibility."""
         with self._history_lock:
             self.history.append((action, output))
+
+    def _generate_fallback_answer(self, task: str) -> str:
+        """Generate a fallback answer when Responder returns None.
+
+        This happens when context is too long or model fails to produce output.
+        Uses execution history to summarize what was accomplished.
+
+        Args:
+            task: The original task query
+
+        Returns:
+            A summary of what was accomplished based on execution history
+        """
+        with self._history_lock:
+            if not self.history:
+                return "Task completed but no summary available."
+
+            # Count artifacts if available
+            artifact_info = ""
+            if self.run_context:
+                images = self.run_context.list_images()
+                if images:
+                    artifact_info = f"\n\nGenerated {len(images)} visualization(s):\n"
+                    for img in images:
+                        artifact_info += f"- {img['filename']}\n"
+
+            # Count code executions
+            code_count = sum(1 for action, _ in self.history if "Code" in action or "Executed" in action)
+
+            # Get last few outputs (last 3 meaningful ones)
+            recent_outputs = []
+            for action, output in reversed(self.history[-5:]):
+                if output and output.strip() and len(output) < 500:
+                    recent_outputs.append(output.strip())
+                if len(recent_outputs) >= 2:
+                    break
+
+            summary = f"Task completed after {len(self.history)} steps with {code_count} code executions."
+            if artifact_info:
+                summary += artifact_info
+            if recent_outputs:
+                summary += "\n\nRecent outputs:\n" + "\n".join(recent_outputs[:2])
+
+            return summary
+
+    def _summarize_with_rag(self, task: str, context: str, indent: str) -> str:
+        """Use RAG-like chunked summarization for large contexts.
+
+        This method:
+        1. Saves the full context to artifacts (preserves research)
+        2. Splits context into chunks
+        3. Summarizes each chunk independently
+        4. Synthesizes into final response
+
+        Args:
+            task: The original task query
+            context: The full execution history (potentially very large)
+            indent: Log indentation for depth tracking
+
+        Returns:
+            Synthesized response from chunked summaries
+        """
+        # Build artifacts info for the summarizer
+        artifacts_info = ""
+        if self.run_context:
+            images = self.run_context.list_images()
+            if images:
+                artifacts_info = "Generated visualizations:\n"
+                for img in images:
+                    artifacts_info += f"- {img['filename']}: {img.get('description', 'Image')}\n"
+
+        try:
+            logger.info(f"{indent}Running RAG-like summarization on {len(context)} chars...")
+            result = self.context_summarizer(
+                query=task,
+                context=context,
+                artifacts_info=artifacts_info
+            )
+
+            response = result.response
+            if response:
+                # Enhance with artifact images if responder has run_context
+                if self.run_context:
+                    response = self.responder._enhance_with_artifacts(response)
+                return response
+            else:
+                logger.warning(f"{indent}RAG summarization returned None. Using basic fallback.")
+                return self._generate_fallback_answer(task)
+
+        except Exception as e:
+            logger.error(f"{indent}RAG summarization failed: {e}")
+            return self._generate_fallback_answer(task)
 
     def format_context(self) -> str:
         """Formats the execution history into a string context."""
@@ -179,9 +275,20 @@ class RLMAgent:
 
             # 2. Execute Action
             if action == "ANSWER":
-                response = self.responder(query=task, context=context)
-                final_answer = response.response
-                logger.info(f"{indent}Final Answer: {final_answer}")
+                # Check if context is too large for direct response
+                if self.context_summarizer.should_chunk(context):
+                    logger.info(f"{indent}Context too large ({len(context)} chars). Using RAG-like summarization.")
+                    final_answer = self._summarize_with_rag(task, context, indent)
+                else:
+                    response = self.responder(query=task, context=context)
+                    final_answer = response.response
+
+                    # Handle None response (can happen with context overflow or model issues)
+                    if final_answer is None:
+                        logger.warning(f"{indent}Responder returned None. Using RAG-like summarization.")
+                        final_answer = self._summarize_with_rag(task, context, indent)
+
+                logger.info(f"{indent}Final Answer: {final_answer[:200]}..." if len(str(final_answer)) > 200 else f"{indent}Final Answer: {final_answer}")
                 return final_answer
 
             elif action == "CODE":
