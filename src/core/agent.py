@@ -11,6 +11,7 @@ from src.core.repl import PythonREPL
 from src.core.budget import BudgetManager
 from src.core.config_loader import ProfileConfig
 from src.core.context_summarizer import ContextSummarizer
+from src.core.parser import is_final, parse_response  # Paper-style FINAL()
 from src.modules.architect import Architect
 from src.modules.coder import Coder
 from src.modules.responder import Responder
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 class CodeExecutor(Protocol):
     """Protocol for code execution backends."""
     def execute(self, code: str) -> str: ...
+    def check_for_final(self, output: str) -> str | None: ...
 
 
 @runtime_checkable
@@ -364,6 +366,19 @@ class RLMAgent:
                     output = self.repl.execute(code)
                     log_msg = f"{indent}Execution Output (truncated): {output[:100]}..." if len(output) > 100 else f"{indent}Execution Output: {output}"
                     logger.info(log_msg)
+
+                    # Check for paper-style FINAL() termination
+                    if hasattr(self.repl, 'check_for_final'):
+                        final_answer = self.repl.check_for_final(output)
+                        if final_answer is not None:
+                            logger.info(f"{indent}FINAL() detected in output. Returning immediately.")
+                            return final_answer
+                    elif is_final(output):
+                        # Fallback for mocked REPLs
+                        final_answer = parse_response(output, {})
+                        if final_answer is not None:
+                            logger.info(f"{indent}FINAL() detected in output. Returning immediately.")
+                            return final_answer
 
                     # Add to both internal history and REPL-accessible history
                     self._add_history(f"Executed Code:\n{code}", output)

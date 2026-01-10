@@ -12,7 +12,7 @@ root:
   provider: ollama
   model: qwen2.5-coder:14b
   max_steps: 24
-  max_depth: 10
+  max_depth: 5
   pricing:
     input_per_1m: 0.0   # Local = free
     output_per_1m: 0.0

@@ -207,3 +207,39 @@ class TestRunContextIntegration:
 
         assert nested_path.exists()
         assert "reports" in str(nested_path)
+
+    def test_no_nested_runs_after_chdir(self, tmp_path: Path):
+        """Regression test: RunContext should not create nested runs/ folders.
+
+        This was a bug where the relative Path("runs") would resolve relative
+        to the current working directory. When REPL did os.chdir() to artifacts,
+        new RunContext instances would create runs/RUNID/runs/RUNID/... trees.
+        """
+        import os
+
+        # Create a RunContext and change to its artifacts directory
+        ctx1 = RunContext(base_dir=tmp_path)
+        original_cwd = os.getcwd()
+
+        try:
+            # Simulate what REPL does: change to artifacts directory
+            os.chdir(str(ctx1.artifacts_dir))
+
+            # Create another RunContext (like a sub-agent might)
+            ctx2 = RunContext(base_dir=tmp_path)
+
+            # The second context should NOT be nested inside the first
+            # It should be a sibling at the same level
+            assert ctx1.artifacts_dir.parent == ctx2.artifacts_dir.parent
+            assert "runs" not in str(ctx2.artifacts_dir.relative_to(tmp_path)).split("/")[1:]
+
+            # Verify no nested runs folders were created
+            for item in ctx1.artifacts_dir.iterdir():
+                assert item.name != "runs", "Nested runs/ folder should not exist"
+        finally:
+            os.chdir(original_cwd)
+
+    def test_runs_base_dir_is_absolute(self):
+        """Verify RUNS_BASE_DIR is an absolute path to prevent cwd issues."""
+        assert RunContext.RUNS_BASE_DIR.is_absolute(), \
+            "RUNS_BASE_DIR must be absolute to avoid nested folder issues with os.chdir()"

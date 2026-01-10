@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Any
 
 
+# Compute project root once at module load time (before any chdir)
+_PROJECT_ROOT = Path(__file__).parent.parent.parent.absolute()
+
+
 class RunContext:
     """Context for a single agent run, managing artifacts and metadata.
 
@@ -20,8 +24,9 @@ class RunContext:
         artifacts: List of artifact metadata (path, type, description)
     """
 
-    # Base directory for all runs (relative to project root)
-    RUNS_BASE_DIR = Path("runs")
+    # Base directory for all runs - MUST be absolute to avoid issues with os.chdir()
+    # in REPL execution (threads share cwd, causing nested runs/ folders)
+    RUNS_BASE_DIR = _PROJECT_ROOT / "runs"
 
     def __init__(self, run_id: str | None = None, base_dir: Path | None = None):
         """Initialize a new run context.
@@ -31,7 +36,8 @@ class RunContext:
             base_dir: Optional custom base directory for runs. Defaults to project's runs/ folder.
         """
         self.run_id = run_id or self._generate_run_id()
-        self._base_dir = base_dir or self.RUNS_BASE_DIR
+        # Ensure base_dir is absolute to prevent nested folder issues
+        self._base_dir = (base_dir.absolute() if base_dir else self.RUNS_BASE_DIR)
         self.artifacts_dir = self._base_dir / self.run_id
         self.artifacts: list[dict[str, Any]] = []
         self._report_content: list[str] = []

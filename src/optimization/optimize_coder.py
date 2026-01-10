@@ -82,6 +82,39 @@ def cleanup_mock_files():
             os.remove(f)
 
 
+def _setup_test_globals(repl: PythonREPL) -> None:
+    """
+    Set up paper-style globals for code validation.
+
+    Creates mock versions of __execution_history__, llm_query, etc.
+    so that paper-style code examples can execute during optimization.
+    """
+    # Mock execution history with sample data
+    repl.globals["__execution_history__"] = [
+        {
+            "step": 1,
+            "code": "results = search_web('AI research')",
+            "output": "Found 5 articles about AI advancements...",
+            "output_length": 500,
+        },
+        {
+            "step": 2,
+            "code": "print(len(results))",
+            "output": "5",
+            "output_length": 1,
+        },
+    ]
+
+    # Mock llm_query function
+    def mock_llm_query(query: str, context: str = "") -> str:
+        """Mock llm_query that returns a reasonable placeholder."""
+        return f"[LLM Response to: {query[:50]}...]"
+
+    repl.globals["llm_query"] = mock_llm_query
+    repl.globals["__task__"] = "Test task for optimization"
+    repl.globals["__artifacts_dir__"] = "/tmp/test_artifacts"
+
+
 def validate_code_execution(example, prediction, trace=None) -> float:
     """
     Metric: Validate that generated code executes successfully.
@@ -97,6 +130,9 @@ def validate_code_execution(example, prediction, trace=None) -> float:
         Float score for the prediction
     """
     repl = PythonREPL()
+
+    # Set up paper-style globals for testing
+    _setup_test_globals(repl)
 
     try:
         # Handle both Prediction object and dict
@@ -133,6 +169,9 @@ def validate_code_with_feedback(example, prediction, trace=None, pred_name=None,
     Returns dict with score and feedback for GEPA's reflective optimization.
     """
     repl = PythonREPL()
+
+    # Set up paper-style globals for testing
+    _setup_test_globals(repl)
 
     try:
         # Handle both Prediction object and dict
