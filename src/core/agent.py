@@ -1,8 +1,11 @@
 import concurrent.futures
 import threading
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+import dspy
+
+from src.config import get_lm_for_role
 from src.core.logger import logger
 from src.core.repl import PythonREPL
 from src.core.budget import BudgetManager
@@ -12,6 +15,9 @@ from src.modules.coder import Coder
 from src.modules.responder import Responder
 from src.modules.delegator import Delegator
 from src.core.explorer import scan_directory
+
+if TYPE_CHECKING:
+    from src.core.run_context import RunContext
 
 
 # Protocol definitions for dependency injection
@@ -52,6 +58,8 @@ class RLMAgent:
         config: ProfileConfig | None = None,
         is_delegate: bool = False,
         budget_manager: BudgetManager | None = None,
+        # Run context for artifact management
+        run_context: "RunContext | None" = None,
         # Dependency injection parameters
         repl: CodeExecutor | None = None,
         architect: TaskRouter | None = None,
@@ -62,6 +70,7 @@ class RLMAgent:
         self.config = config
         self.is_delegate = is_delegate
         self.budget_manager = budget_manager
+        self.run_context = run_context
 
         # Use config settings if provided, otherwise use parameters
         if config:
@@ -76,24 +85,42 @@ class RLMAgent:
         self.root_dir = Path(root_dir) if root_dir else None
 
         # Use injected dependencies or create defaults
-        self.repl = repl if repl else PythonREPL()
+        # Pass run_context to REPL so files are saved to artifacts folder
+        # Pass root_dir as context_dir so code can access input files
+        self.repl = repl if repl else PythonREPL(
+            run_context=run_context,
+            context_dir=str(self.root_dir.absolute()) if self.root_dir else None,
+        )
         self.architect = architect if architect else Architect()
         self.coder = coder if coder else Coder()
-        self.responder = responder if responder else Responder()
+        self.responder = responder if responder else Responder(run_context=run_context)
         self.delegator = delegator if delegator else Delegator()
 
         # Thread-safe history tracking (Python 3.14t compatibility)
         self._history_lock = threading.Lock()
         self.history: list[tuple[str, str]] = []  # List of (Action/Code, Output)
 
-        # Initialize context with file listing if root_dir is provided
+        # Build initialization context
+        init_parts = []
+
+        # Add artifacts directory info if available
+        if run_context:
+            init_parts.append(
+                f"OUTPUT DIRECTORY: {run_context.artifacts_dir}\n"
+                "Use __artifacts_dir__ in code to save files (images, reports, data)."
+            )
+
+        # Add input files context if root_dir is provided
         if self.root_dir and self.root_dir.exists():
             file_structure = scan_directory(self.root_dir)
-            initial_context = (
-                f"AVAILABLE FILES (Use Python code to read them):\n{file_structure}\n"
-                f"NOTE: To access file content, you MUST generate Python code using open(), pd.read_csv(), etc."
+            init_parts.append(
+                f"INPUT FILES (in {self.root_dir}):\n{file_structure}\n"
+                "Use __context_dir__ in code to access these files.\n"
+                "Example: open(f'{__context_dir__}/data.csv') or pd.read_csv(f'{__context_dir__}/data.csv')"
             )
-            self._add_history("System Initialization", initial_context)
+
+        if init_parts:
+            self._add_history("System Initialization", "\n\n".join(init_parts))
 
     def _add_history(self, action: str, output: str) -> None:
         """Thread-safe history append for Python 3.14t compatibility."""
@@ -120,6 +147,21 @@ class RLMAgent:
         indent = "  " * self.depth
         logger.info(f"{indent}Agent (Depth {self.depth}) received task: {task}")
 
+        # For delegates running in ThreadPoolExecutor threads, we need to use
+        # dspy.context() as a context manager which provides thread-local settings.
+        # dspy.configure() is restricted to the thread that initially set it up.
+        if self.is_delegate and self.config:
+            role = "delegate"
+            lm = get_lm_for_role(role, self.config, budget_manager=self.budget_manager)
+            logger.debug(f"{indent}Configured delegate LM: {self.config.delegate.model}")
+            # Use context manager for thread-local LM settings
+            with dspy.context(lm=lm):
+                return self._run_loop(task, indent)
+        else:
+            return self._run_loop(task, indent)
+
+    def _run_loop(self, task: str, indent: str) -> str:
+        """Internal run loop, separated to support dspy.context() wrapper."""
         for step in range(self.max_steps):
             logger.info(f"{indent}--- Step {step + 1} ---")
             context = self.format_context()
@@ -187,7 +229,7 @@ class RLMAgent:
                         futures = {}
                         for i, subtask in enumerate(subtasks):
                             # Instantiate new agent for each subtask
-                            # Pass config and mark as delegate
+                            # Pass config, run_context, and mark as delegate
                             sub_agent = RLMAgent(
                                 max_steps=self.max_steps,
                                 max_depth=self.max_depth,
@@ -195,6 +237,7 @@ class RLMAgent:
                                 config=self.config,
                                 is_delegate=True,
                                 budget_manager=self.budget_manager,
+                                run_context=self.run_context,  # Share artifact folder
                             )
                             futures[executor.submit(sub_agent.run, subtask)] = subtask
 

@@ -239,6 +239,96 @@ def get_architect_data() -> list[dspy.Example]:
             data_desc="AVAILABLE FILES:\n[FILE] data1.csv\n[FILE] data2.csv\nExecution History:\n",
             action="CODE"  # Need to read both files
         ).with_inputs("query", "data_desc"),
+
+        # =====================================================================
+        # FAILURE CASES: Verbose Output Prevention
+        # These examples teach the model to output ONLY the action word
+        # =====================================================================
+        # Research task that should ANSWER (not output steps)
+        dspy.Example(
+            query="Analyze the current state of AI research and summarize key trends",
+            data_desc="Execution History:\n",
+            action="ANSWER"  # NOT "1. CATEGORIZE THE ARTICLES..."
+        ).with_inputs("query", "data_desc"),
+
+        # Complex request but just needs direct answer
+        dspy.Example(
+            query="Summarize the key findings from the research papers",
+            data_desc="Execution History:\nPrevious: Web search returned 5 articles about LLMs\n",
+            action="ANSWER"  # NOT "First, I will analyze each paper..."
+        ).with_inputs("query", "data_desc"),
+
+        # Multi-part question that tempts verbose response
+        dspy.Example(
+            query="Explain 1) Language model trends, 2) Computer vision advances",
+            data_desc="Execution History:\n",
+            action="DELEGATE"  # Should delegate, not list steps
+        ).with_inputs("query", "data_desc"),
+
+        # After delegation complete
+        dspy.Example(
+            query="Explain 1) Language model trends, 2) Computer vision advances",
+            data_desc="Execution History:\nDelegated to 2 sub-agents.\nResults:\n- LLM: Scaling laws continue...\n- CV: Vision transformers dominate...\n",
+            action="ANSWER"  # Combine results, don't re-delegate
+        ).with_inputs("query", "data_desc"),
+
+        # =====================================================================
+        # FAILURE CASES: Action Word Clarity
+        # =====================================================================
+        # Should be CODE not "I will calculate"
+        dspy.Example(
+            query="Calculate the sum of numbers from 1 to 100",
+            data_desc="Execution History:\n",
+            action="CODE"  # NOT "First, I will calculate..."
+        ).with_inputs("query", "data_desc"),
+
+        # Should be ANSWER not "I will explain"
+        dspy.Example(
+            query="What is machine learning?",
+            data_desc="Execution History:\n",
+            action="ANSWER"  # NOT "I will explain machine learning..."
+        ).with_inputs("query", "data_desc"),
+
+        # Should be DELEGATE not "I will split"
+        dspy.Example(
+            query="Process items A, B, C, D, E in parallel and summarize each",
+            data_desc="Execution History:\n",
+            action="DELEGATE"  # NOT "I will split this into subtasks..."
+        ).with_inputs("query", "data_desc"),
+
+        # =====================================================================
+        # FAILURE CASES: Numbered List Prevention
+        # =====================================================================
+        # Should not return "1. First step 2. Second step"
+        dspy.Example(
+            query="Create a bar chart from the sales data",
+            data_desc="AVAILABLE FILES:\n[FILE] sales.csv\nExecution History:\n",
+            action="CODE"  # NOT "1. Load the data 2. Create chart..."
+        ).with_inputs("query", "data_desc"),
+
+        # Conceptual question - single word answer
+        dspy.Example(
+            query="How do neural networks learn?",
+            data_desc="Execution History:\n",
+            action="ANSWER"  # NOT "1. Forward pass 2. Compute loss..."
+        ).with_inputs("query", "data_desc"),
+
+        # =====================================================================
+        # EDGE CASES: Context-Aware Decisions
+        # =====================================================================
+        # Has artifacts directory, should save output there
+        dspy.Example(
+            query="Generate a visualization of the data",
+            data_desc="OUTPUT DIRECTORY: /runs/20260109_123456\nAVAILABLE FILES:\n[FILE] data.csv\nExecution History:\n",
+            action="CODE"  # Needs to create and save chart
+        ).with_inputs("query", "data_desc"),
+
+        # Context directory provided, need to read files
+        dspy.Example(
+            query="Summarize all the text files in the context",
+            data_desc="INPUT FILES (in /data/docs):\n[FILE] report1.txt\n[FILE] report2.txt\n[FILE] summary.md\nExecution History:\n",
+            action="CODE"  # Need to read files first
+        ).with_inputs("query", "data_desc"),
     ]
     return dataset
 

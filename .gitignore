@@ -210,3 +210,4 @@ logs/
 *.db
 data/
 scripts/
+runs/

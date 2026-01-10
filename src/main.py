@@ -125,21 +125,32 @@ def main():
         )
 
         # Print results
-        logger.info("\n" + "="*50)
-        logger.info("FINAL RESULT:")
-        logger.info(result.answer)
-        logger.info("="*50)
+        print("\n" + "="*60)
+        print("FINAL RESULT")
+        print("="*60)
+        print(result.answer)
+        print("="*60)
+
+        # Print artifacts info
+        if result.artifacts_folder:
+            print(f"\n📁 Artifacts: {result.artifacts_folder}")
+            if result.generated_images:
+                print(f"   🖼️  Images: {len(result.generated_images)}")
+                for img in result.generated_images:
+                    print(f"      - {img['filename']}")
+            print(f"   📄 Report: {result.artifacts_folder / 'report.md'}")
 
         # Print cost breakdown
         if result.model_breakdown:
-            logger.info("\n" + "-"*50)
-            logger.info("COST BREAKDOWN:")
+            print("\n" + "-"*60)
+            print("COST BREAKDOWN")
+            print("-"*60)
             for model_id, cost in result.model_breakdown.items():
-                logger.info(f"  {model_id}: ${cost:.4f}")
-            logger.info(f"  TOTAL: ${result.total_cost:.4f}")
-            logger.info(f"  Duration: {result.duration_seconds:.2f}s")
-            logger.info(f"  Steps: {result.step_count}")
-            logger.info("-"*50)
+                print(f"  {model_id}: ${cost:.4f}")
+            print(f"\n  TOTAL: ${result.total_cost:.4f}")
+            print(f"  Duration: {result.duration_seconds:.2f}s")
+            print(f"  Steps: {result.step_count}")
+            print("-"*60)
 
     except FileNotFoundError as e:
         logger.error(f"Config file not found: {e}")

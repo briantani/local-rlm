@@ -1,436 +1,287 @@
-{% extends "base.html" %}
+{% extends "base_simple.html" %}
 
-{% block title %}RLM Agent - Home{% endblock %}
+{% block title %}RLM Agent{% endblock %}
 
 {% block content %}
-<div x-data="taskRunner()" x-init="init()" class="space-y-6">
+<div class="min-h-screen flex flex-col">
+    <!-- Simple Header -->
+    <header class="bg-white border-b border-gray-200 px-4 py-3">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl">🧠</span>
+                <h1 class="text-xl font-bold text-gray-900">RLM Agent</h1>
+            </div>
+            <a href="/configs" class="text-sm text-gray-500 hover:text-gray-700">Configs</a>
+        </div>
+    </header>
 
-    <!-- Task Input Card -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">🎯 Run a Task</h2>
+    <!-- Main Chat Area -->
+    <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6" x-data="rlmChat()" x-init="init()">
 
-        <form @submit.prevent="submitTask" class="space-y-4">
-            <!-- Config Selector -->
-            <div>
-                <label for="config" class="block text-sm font-medium text-gray-700 mb-2">
-                    Configuration Profile
-                </label>
-                <select
-                    id="config"
-                    x-model="selectedConfig"
-                    @change="onConfigChange"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    :disabled="isRunning"
-                >
-                    <option value="" x-show="configs.length === 0">Loading configs...</option>
-                    <option value="" x-show="configs.length > 0" disabled>Select a configuration...</option>
-                    <template x-for="config in configs" :key="config.name">
-                        <option :value="config.name" x-text="`${config.name} - ${config.description}`"></option>
-                    </template>
-                </select>
-                <p class="mt-1 text-sm text-gray-500" x-show="configDetails" x-cloak>
-                    <span x-text="configDetails"></span>
-                </p>
+    <!-- Chat Container -->
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+
+        <!-- Messages Area -->
+        <div id="messages" class="min-h-[400px] max-h-[600px] overflow-y-auto p-6 space-y-6">
+
+            <!-- Welcome Message -->
+            <div x-show="!taskId && !isRunning" class="text-center py-12 text-gray-500">
+                <div class="text-6xl mb-4">🚀</div>
+                <p class="text-lg">Enter a task below to get started</p>
+                <p class="text-sm mt-2">The agent will write and execute Python code to solve your problem</p>
             </div>
 
-            <!-- Template Selector (Optional) -->
-            <div>
-                <label for="template" class="block text-sm font-medium text-gray-700 mb-2">
-                    Load from Template (Optional)
-                    <span class="text-gray-500 text-xs">— Start with a saved configuration</span>
-                </label>
-                <div class="flex space-x-2">
-                    <select
-                        id="template"
-                        x-model="selectedTemplate"
-                        class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        :disabled="isRunning"
-                    >
-                        <option value="">No template (manual entry)</option>
-                        <template x-for="template in templates" :key="template.id">
-                            <option :value="template.id" x-text="`${template.name} — ${template.description}`"></option>
-                        </template>
-                    </select>
-                    <button
-                        type="button"
-                        @click="applyTemplate"
-                        class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400 transition"
-                        :disabled="!selectedTemplate || isRunning"
-                    >
-                        Apply
-                    </button>
+            <!-- User's Task -->
+            <div x-show="submittedTask" x-cloak class="flex justify-end">
+                <div class="bg-blue-600 text-white rounded-lg px-4 py-3 max-w-[80%]">
+                    <div class="text-sm font-medium mb-1">You</div>
+                    <div class="whitespace-pre-wrap" x-text="submittedTask"></div>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">
-                    📚 Templates let you reuse successful task configurations. Save one from a completed task result!
-                </p>
+            </div>
+
+            <!-- Agent Response Area -->
+            <div x-show="taskId" x-cloak class="flex justify-start">
+                <div class="bg-gray-100 rounded-lg px-4 py-3 max-w-[90%] w-full">
+                    <div class="text-sm font-medium text-gray-700 mb-2">🤖 Agent</div>
+
+                    <!-- Loading/Thinking State -->
+                    <div x-show="isRunning && !answer" class="flex items-center space-x-2 text-gray-600">
+                        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span x-text="statusMessage || 'Thinking...'"></span>
+                    </div>
+
+                    <!-- Live Steps (while running) -->
+                    <div x-show="isRunning && steps.length > 0" class="space-y-2 mb-4">
+                        <template x-for="(step, idx) in steps" :key="idx">
+                            <div class="border-l-2 border-blue-400 pl-3 py-1">
+                                <div class="text-xs font-medium text-blue-600" x-text="'Step ' + (idx + 1) + ': ' + step.action"></div>
+                                <div x-show="step.code" class="mt-1">
+                                    <pre class="bg-gray-800 text-green-400 text-xs p-2 rounded overflow-x-auto max-h-32"><code x-text="step.code"></code></pre>
+                                </div>
+                                <div x-show="step.output" class="mt-1 text-xs text-gray-600 bg-white p-2 rounded max-h-24 overflow-y-auto">
+                                    <pre x-text="step.output"></pre>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Final Answer -->
+                    <div x-show="answer" x-cloak>
+                        <div class="prose prose-sm max-w-none" x-html="formatMarkdown(answer)"></div>
+
+                        <!-- Execution Summary (collapsible) -->
+                        <div x-show="result" x-cloak class="mt-4 pt-4 border-t border-gray-200">
+                            <button @click="showDetails = !showDetails"
+                                    class="text-sm text-gray-500 hover:text-gray-700 flex items-center space-x-1">
+                                <svg class="w-4 h-4 transition-transform" :class="{'rotate-90': showDetails}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                                <span>Details: <span x-text="result?.step_count || 0"></span> steps, $<span x-text="result?.total_cost?.toFixed(4) || '0.00'"></span>, <span x-text="result?.duration_seconds?.toFixed(1) || '0'"></span>s</span>
+                            </button>
+
+                            <!-- Expanded Details -->
+                            <div x-show="showDetails" x-cloak class="mt-3 space-y-2">
+                                <template x-for="(step, idx) in (result?.execution_history || [])" :key="idx">
+                                    <div class="bg-white rounded p-3 text-sm">
+                                        <div class="font-medium text-gray-700">
+                                            Step <span x-text="step.step"></span>:
+                                            <span class="px-2 py-0.5 rounded text-xs"
+                                                  :class="{
+                                                      'bg-blue-100 text-blue-800': step.action === 'CODE',
+                                                      'bg-purple-100 text-purple-800': step.action === 'DELEGATE',
+                                                      'bg-green-100 text-green-800': step.action === 'ANSWER',
+                                                      'bg-gray-100 text-gray-800': !['CODE', 'DELEGATE', 'ANSWER'].includes(step.action)
+                                                  }"
+                                                  x-text="step.action"></span>
+                                        </div>
+                                        <div x-show="step.input" class="mt-2">
+                                            <div class="text-xs text-gray-500">Input:</div>
+                                            <pre class="bg-gray-50 p-2 rounded text-xs overflow-x-auto max-h-40" x-text="step.input"></pre>
+                                        </div>
+                                        <div x-show="step.output" class="mt-2">
+                                            <div class="text-xs text-gray-500">Output:</div>
+                                            <pre class="bg-gray-50 p-2 rounded text-xs overflow-x-auto max-h-40" x-text="step.output"></pre>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error Display -->
+                    <div x-show="error" x-cloak class="bg-red-50 border border-red-200 rounded p-3 mt-2">
+                        <div class="text-red-800 font-medium">❌ Error</div>
+                        <div class="text-red-700 text-sm mt-1" x-text="error"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="border-t border-gray-200 p-4 bg-gray-50">
+            <!-- Config Selector (compact) -->
+            <div class="flex items-center space-x-4 mb-3">
+                <label class="text-sm text-gray-600">Config:</label>
+                <select x-model="selectedConfig"
+                        @change="onConfigChange"
+                        :disabled="isRunning"
+                        class="text-sm border border-gray-300 rounded px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">Select...</option>
+                    <template x-for="config in configs" :key="config.name">
+                        <option :value="config.name" x-text="config.name"></option>
+                    </template>
+                </select>
+                <span x-show="selectedConfig" x-cloak class="text-xs text-gray-500" x-text="configDescription"></span>
+            </div>
+
+            <!-- Context Path (optional, collapsible) -->
+            <div x-show="showContextInput" x-cloak class="mb-3">
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm text-gray-600">Context folder:</label>
+                    <input type="text"
+                           x-model="contextPath"
+                           :disabled="isRunning"
+                           placeholder="/path/to/files"
+                           class="flex-1 text-sm border border-gray-300 rounded px-3 py-1.5 focus:ring-2 focus:ring-blue-500">
+                    <button @click="showContextInput = false" class="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
             </div>
 
             <!-- Task Input -->
-            <div>
-                <label for="task" class="block text-sm font-medium text-gray-700 mb-2">
-                    Task Description
-                </label>
-                <textarea
-                    id="task"
-                    x-model="taskText"
-                    rows="4"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., Calculate the 100th fibonacci number"
-                    :disabled="isRunning"
-                ></textarea>
-            </div>
-            <!-- Context Path (Optional) -->
-            <div>
-                <label for="contextPath" class="block text-sm font-medium text-gray-700 mb-2">
-                    Context Folder (Optional)
-                    <span class="text-gray-500 text-xs">— Absolute path to folder with files the agent can access</span>
-                </label>
-                <div class="flex gap-2">
-                    <input
-                        id="contextPath"
-                        x-model="contextPath"
-                        type="text"
-                        class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        :placeholder="contextPathPlaceholder"
-                        :disabled="isRunning"
-                    />
-                    <button
-                        @click="selectFolder()"
-                        type="button"
-                        :disabled="isRunning"
-                        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md border border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        title="Browse to find folder name, then enter full path"
-                    >
-                        📁 Browse
+            <form @submit.prevent="submitTask" class="flex space-x-3">
+                <div class="flex-1 relative">
+                    <textarea x-model="taskText"
+                              :disabled="isRunning"
+                              rows="2"
+                              @keydown.enter.meta="submitTask"
+                              @keydown.enter.ctrl="submitTask"
+                              placeholder="Describe your task... (Cmd/Ctrl+Enter to submit)"
+                              class="w-full border border-gray-300 rounded-lg px-4 py-3 pr-12 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                    <button type="button"
+                            @click="showContextInput = !showContextInput"
+                            class="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                            title="Add context folder">
+                        📁
                     </button>
                 </div>
-                <div x-show="folderHint" x-transition class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <p class="text-sm text-blue-800" x-html="folderHint"></p>
-                </div>
-                <p class="mt-1 text-xs text-gray-500">
-                    💡 Agent can read files using Python code (e.g., <code class="bg-gray-100 px-1 rounded">pd.read_csv('data.csv')</code>).
-                    Folder contents will be listed at the start of execution.
-                </p>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="flex items-center justify-between">
-                <button
-                    type="submit"
-                    class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-                    :disabled="!canSubmit"
-                >
-                    <span x-show="!isRunning" x-cloak>▶️ Run Task</span>
-                    <span x-show="isRunning" x-cloak>⏳ Running...</span>
+                <button type="submit"
+                        :disabled="!canSubmit"
+                        class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition">
+                    <span x-show="!isRunning">Send</span>
+                    <span x-show="isRunning" class="flex items-center space-x-1">
+                        <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span>Running...</span>
+                    </span>
                 </button>
+            </form>
 
-                <button
-                    v-show="isRunning"
-                    @click="stopTask"
-                    type="button"
-                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
-                    x-show="isRunning"
-                    x-cloak
-                >
-                    ⏹️ Stop
+            <!-- Stop Button -->
+            <div x-show="isRunning" x-cloak class="mt-2 text-center">
+                <button @click="stopTask" class="text-sm text-red-600 hover:text-red-800">
+                    ⏹ Stop execution
                 </button>
             </div>
-        </form>
-    </div>
-
-    <!-- Execution Area -->
-    <div x-show="taskId" x-cloak class="space-y-4">
-
-        <!-- Steps Container -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                📋 Execution Steps
-            </h3>
-
-            <div class="space-y-3">
-                <template x-for="(step, index) in steps" :key="index">
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <!-- Step Header -->
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-sm font-medium text-gray-700">
-                                Step <span x-text="index + 1"></span>: <span x-text="step.action"></span>
-                            </span>
-                            <span
-                                class="text-xs px-2 py-1 rounded"
-                                :class="{
-                                    'bg-blue-100 text-blue-800': step.status === 'running',
-                                    'bg-green-100 text-green-800': step.status === 'complete',
-                                    'bg-red-100 text-red-800': step.status === 'error'
-                                }"
-                                x-text="step.status"
-                            ></span>
-                        </div>
-
-                        <!-- Code Block (if exists) -->
-                        <div x-show="step.code" x-cloak class="mt-3">
-                            <div class="text-xs text-gray-500 mb-1">Code:</div>
-                            <pre class="bg-gray-900 text-gray-100 p-3 rounded text-sm overflow-x-auto"><code x-text="step.code"></code></pre>
-                        </div>
-
-                        <!-- Output Block (if exists) -->
-                        <div x-show="step.output" x-cloak class="mt-3">
-                            <div class="text-xs text-gray-500 mb-1">Output:</div>
-                            <pre class="bg-gray-50 border border-gray-200 p-3 rounded text-sm overflow-x-auto"><code x-text="step.output"></code></pre>
-                        </div>
-                    </div>
-                </template>
-
-                <!-- Empty State -->
-                <div x-show="steps.length === 0" x-cloak class="text-center py-8 text-gray-400">
-                    Waiting for execution to start...
-                </div>
-            </div>
-        </div>
-
-        <!-- Final Result - Canvas View -->
-        <div x-show="result" x-cloak>
-            <div x-data="canvasViewer(result, taskId, steps)">
-                {% include 'components/canvas.html' %}
-            </div>
-        </div>
-
-        <!-- Error Display -->
-        <div x-show="error" x-cloak class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <h3 class="text-lg font-semibold text-red-900 mb-2">
-                ❌ Error
-            </h3>
-            <p class="text-red-700" x-text="error"></p>
-        </div>
-
-        <!-- Chat Panel (appears after completion) -->
-        <div x-show="result && currentTaskId" x-cloak :data-task-id="currentTaskId">
-            {% include 'components/chat_panel.html' %}
         </div>
     </div>
 
+    <!-- Quick Tips -->
+    <div class="mt-4 text-center text-sm text-gray-500">
+        <p>💡 The agent writes Python code to solve your problem</p>
+    </div>
+    </main>
 </div>
-
-<!-- API Key Modal Component -->
-{% include 'components/api_key_modal.html' %}
-
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-function taskRunner() {
+function rlmChat() {
     return {
-        // Config state
+        // Config
         configs: [],
         selectedConfig: '',
-        configDetails: '',
-        requiredProviders: [],
+        configDescription: '',
 
-        // Template state
-        templates: [],
-        selectedTemplate: '',
-
-        // Task state
+        // Input
         taskText: '',
         contextPath: '',
-        contextPathPlaceholder: '',
-        folderHint: '',
-        taskId: null,
-        currentTaskId: null,  // For chat panel integration
-        isRunning: false,
+        showContextInput: false,
 
-        async selectFolder() {
-            try {
-                const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-                const isWindows = navigator.platform.toUpperCase().indexOf('WIN') >= 0;
-
-                // Try modern File System Access API first (Chrome/Edge)
-                if ('showDirectoryPicker' in window) {
-                    const dirHandle = await window.showDirectoryPicker({
-                        mode: 'read',
-                        startIn: 'downloads' // Defaults to downloads folder
-                    });
-
-                    const folderName = dirHandle.name;
-
-                    // Provide OS-specific path hints
-                    if (isMac) {
-                        this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Common Mac paths:</strong><br>• Downloads: <code>/Users/yourname/Downloads</code><br>• Documents: <code>/Users/yourname/Documents</code><br>• Desktop: <code>/Users/yourname/Desktop</code><br><em>Replace "yourname" with your username</em>`;
-                        // Try to be helpful - if it's Downloads, suggest the path
-                        if (folderName === 'Downloads') {
-                            this.contextPath = '/Users/' + (process.env.USER || 'yourname') + '/Downloads';
-                        }
-                    } else if (isWindows) {
-                        this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Common Windows paths:</strong><br>• Downloads: <code>C:\\Users\\yourname\\Downloads</code><br>• Documents: <code>C:\\Users\\yourname\\Documents</code><br>• Desktop: <code>C:\\Users\\yourname\\Desktop</code><br><em>Replace "yourname" with your username</em>`;
-                        if (folderName === 'Downloads') {
-                            this.contextPath = 'C:\\Users\\yourname\\Downloads';
-                        }
-                    } else {
-                        this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Linux path example:</strong> <code>/home/yourname/${folderName.toLowerCase()}</code>`;
-                    }
-
-                } else {
-                    // Fallback: show file input dialog
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.webkitdirectory = true;
-                    input.directory = true;
-
-                    input.onchange = (e) => {
-                        const files = e.target.files;
-                        if (files && files.length > 0) {
-                            const fullPath = files[0].webkitRelativePath || files[0].name;
-                            const folderName = fullPath.split('/')[0];
-
-                            if (isMac) {
-                                this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Enter full Mac path above</strong>, e.g.: <code>/Users/yourname/${folderName}</code>`;
-                            } else if (isWindows) {
-                                this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Enter full Windows path above</strong>, e.g.: <code>C:\\Users\\yourname\\${folderName}</code>`;
-                            } else {
-                                this.folderHint = `<strong>Selected:</strong> ${folderName}<br><strong>Enter full path above</strong>, e.g.: <code>/home/yourname/${folderName.toLowerCase()}</code>`;
-                            }
-                        }
-                    };
-
-                    input.click();
-                }
-            } catch (err) {
-                // User cancelled - don't show error
-                if (err.name !== 'AbortError') {
-                    console.error('Error selecting folder:', err);
-                    this.folderHint = '<strong>Error:</strong> Could not access folder picker. Please enter the path manually.';
-                }
-            }
-        },
+        // Session management
+        sessionId: null,
 
         // Execution state
+        taskId: null,
+        submittedTask: '',
+        isRunning: false,
+        statusMessage: '',
         steps: [],
+        answer: '',
         result: null,
         error: null,
-
-        // WebSocket
         ws: null,
 
-        async init() {
-            // Detect OS for better path hints
-            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-            const isWindows = navigator.platform.toUpperCase().indexOf('WIN') >= 0;
+        // UI state
+        showDetails: false,
 
-            if (isMac) {
-                this.contextPathPlaceholder = 'e.g., /Users/yourname/Downloads';
-            } else if (isWindows) {
-                this.contextPathPlaceholder = 'e.g., C:\\Users\\yourname\\Downloads';
-            } else {
-                this.contextPathPlaceholder = 'e.g., /home/yourname/downloads';
+        async init() {
+            await this.initSession();
+            await this.loadConfigs();
+        },
+
+        async initSession() {
+            // Check for existing session
+            let sessionId = localStorage.getItem('rlm_session_id');
+
+            if (!sessionId) {
+                // Create new session
+                try {
+                    const response = await fetch('/api/sessions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        sessionId = data.session_id;
+                        localStorage.setItem('rlm_session_id', sessionId);
+                    }
+                } catch (e) {
+                    console.error('Failed to create session:', e);
+                }
             }
 
-            await this.loadConfigs();
-            await this.loadTemplates();
+            this.sessionId = sessionId;
         },
 
         async loadConfigs() {
             try {
                 const response = await fetch('/api/configs');
                 const data = await response.json();
-                // Handle both array and {profiles: [...], count: ...} response formats
-                const configsList = data.profiles || data;
-                this.configs = configsList;
+                this.configs = data.profiles || data || [];
 
-                // Check if there's a config in URL params
-                const urlParams = new URLSearchParams(window.location.search);
-                const configParam = urlParams.get('config');
-
-                // Try to find local-only config as default
-                const localOnlyConfig = configsList.find(c => c.name === 'local-only');
-
-                // Select config: URL param > local-only > first in list
-                if (configParam && configsList.some(c => c.name === configParam)) {
-                    this.selectedConfig = configParam;
-                    await this.onConfigChange();
-                } else if (localOnlyConfig) {
+                // Auto-select first config or local-only if available
+                const localOnly = this.configs.find(c => c.name === 'local-only');
+                if (localOnly) {
                     this.selectedConfig = 'local-only';
-                    await this.onConfigChange();
-                } else if (configsList.length > 0) {
-                    this.selectedConfig = configsList[0].name;
-                    await this.onConfigChange();
+                    this.configDescription = localOnly.description;
+                } else if (this.configs.length > 0) {
+                    this.selectedConfig = this.configs[0].name;
+                    this.configDescription = this.configs[0].description;
                 }
             } catch (e) {
                 console.error('Failed to load configs:', e);
             }
         },
 
-        async loadTemplates() {
-            try {
-                const response = await fetch('/api/templates');
-                const data = await response.json();
-                this.templates = data;
-            } catch (e) {
-                console.error('Failed to load templates:', e);
-                this.templates = [];
-            }
-        },
-
-        async applyTemplate() {
-            if (!this.selectedTemplate) return;
-
-            try {
-                const response = await fetch(`/api/templates/${this.selectedTemplate}/apply`, {
-                    method: 'POST'
-                });
-
-                if (!response.ok) throw new Error('Failed to apply template');
-
-                const data = await response.json();
-
-                // Apply template data to form
-                this.taskText = data.task_text;
-                this.contextPath = data.context_path || '';
-                this.selectedConfig = data.config_name;
-
-                // Update config details
-                await this.onConfigChange();
-
-                alert('Template applied successfully!');
-            } catch (e) {
-                console.error('Apply template failed:', e);
-                alert('Failed to apply template: ' + e.message);
-            }
-        },
-
-        async onConfigChange() {
-            if (!this.selectedConfig) return;
-
-            try {
-                const response = await fetch(`/api/configs/${this.selectedConfig}`);
-                const config = await response.json();
-
-                this.configDetails = config.description;
-                this.requiredProviders = config.required_providers || [];
-
-                // Check if API keys are needed (but don't prompt on initial load for local-only)
-                await this.checkApiKeys();
-            } catch (e) {
-                console.error('Failed to load config details:', e);
-            }
-        },
-
-        async checkApiKeys() {
-            const session = Alpine.store('sessionStore');
-            await session.checkApiKeys();
-
-            // Don't show modal for local-only config (no API keys needed)
-            if (this.selectedConfig === 'local-only') {
-                return;
-            }
-
-            // Check if required keys are missing
-            const missingKeys = this.requiredProviders.filter(
-                provider => !session.apiKeys[provider.toLowerCase()]
-            );
-
-            if (missingKeys.length > 0) {
-                // Open modal to configure API keys
-                this.$dispatch('open-api-key-modal', { providers: missingKeys });
-            }
+        onConfigChange() {
+            const config = this.configs.find(c => c.name === this.selectedConfig);
+            this.configDescription = config?.description || '';
         },
 
         get canSubmit() {
@@ -440,43 +291,74 @@ function taskRunner() {
         async submitTask() {
             if (!this.canSubmit) return;
 
-            const session = Alpine.store('sessionStore');
+            // Ensure we have a session
+            if (!this.sessionId) {
+                await this.initSession();
+                if (!this.sessionId) {
+                    this.error = 'Failed to create session. Please refresh the page.';
+                    return;
+                }
+            }
 
             // Reset state
+            this.submittedTask = this.taskText;
             this.steps = [];
+            this.answer = '';
             this.result = null;
             this.error = null;
             this.isRunning = true;
+            this.statusMessage = 'Starting...';
+            this.showDetails = false;
 
             try {
-                // Create task
                 const requestBody = {
                     task: this.taskText,
                     config_name: this.selectedConfig
                 };
-
-                // Include context_path if provided
                 if (this.contextPath.trim()) {
                     requestBody.context_path = this.contextPath.trim();
                 }
 
                 const response = await fetch('/api/tasks', {
                     method: 'POST',
-                    headers: session.getHeaders(),
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-ID': this.sessionId
+                    },
                     body: JSON.stringify(requestBody)
                 });
 
-                if (!response.ok) {
+                // Handle session expired (server restarted)
+                if (response.status === 401 || response.status === 404) {
+                    localStorage.removeItem('rlm_session_id');
+                    await this.initSession();
+                    // Retry once
+                    const retryResponse = await fetch('/api/tasks', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Session-ID': this.sessionId
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+                    if (!retryResponse.ok) {
+                        const error = await retryResponse.json();
+                        throw new Error(error.detail || 'Failed to create task');
+                    }
+                    const task = await retryResponse.json();
+                    this.taskId = task.task_id;
+                } else if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.detail || 'Failed to create task');
+                } else {
+                    const task = await response.json();
+                    this.taskId = task.task_id;
                 }
 
-                const task = await response.json();
-                this.taskId = task.task_id;
-                this.currentTaskId = task.task_id;  // Set for chat panel
+                this.taskText = ''; // Clear input
 
-                // Connect to WebSocket for real-time updates
                 this.connectWebSocket();
+                this.scrollToBottom();
 
             } catch (e) {
                 this.error = e.message;
@@ -493,11 +375,13 @@ function taskRunner() {
             this.ws.onmessage = (event) => {
                 const update = JSON.parse(event.data);
                 this.handleUpdate(update);
+                this.scrollToBottom();
             };
 
             this.ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
-                this.error = 'Connection error occurred';
+                this.error = 'Connection error';
+                this.isRunning = false;
             };
 
             this.ws.onclose = () => {
@@ -506,74 +390,56 @@ function taskRunner() {
         },
 
         handleUpdate(update) {
+            console.log('Update:', update);  // Debug logging
+
             switch (update.type) {
                 case 'status':
-                    // Status update
+                    this.statusMessage = update.data.status === 'running' ? 'Working...' : update.data.status;
                     break;
 
                 case 'step':
-                    // New step started
+                    // General step update (DELEGATE, INIT, OTHER)
                     this.steps.push({
                         action: update.data.action,
-                        status: 'running',
                         code: null,
-                        output: null
+                        output: update.data.output || update.data.input
                     });
+                    this.statusMessage = `Step ${update.data.step}: ${update.data.action}`;
                     break;
 
                 case 'code':
-                    // Code generated - create step if doesn't exist
-                    if (this.steps.length === 0 || this.steps[this.steps.length - 1].code !== null) {
-                        // New CODE step
-                        this.steps.push({
-                            action: 'CODE',
-                            status: 'running',
-                            code: update.data.code,
-                            output: null
-                        });
-                    } else {
-                        this.steps[this.steps.length - 1].code = update.data.code;
-                    }
+                    // Code generation
+                    this.steps.push({
+                        action: 'CODE',
+                        code: update.data.code,
+                        output: null
+                    });
+                    this.statusMessage = `Step ${update.data.step}: Executing code...`;
                     break;
 
                 case 'output':
-                    // Code execution output - ensure step exists
-                    if (this.steps.length === 0) {
-                        // Create step if missing
-                        this.steps.push({
-                            action: 'CODE',
-                            status: 'running',
-                            code: null,
-                            output: update.data.output
-                        });
-                    } else {
-                        this.steps[this.steps.length - 1].output = update.data.output;
-                        this.steps[this.steps.length - 1].status = 'complete';
+                    // Code execution output
+                    if (this.steps.length > 0) {
+                        const lastStep = this.steps[this.steps.length - 1];
+                        if (lastStep.action === 'CODE' && !lastStep.output) {
+                            lastStep.output = update.data.output;
+                        }
                     }
                     break;
 
                 case 'complete':
-                    // Task completed
-                    if (this.steps.length > 0) {
-                        this.steps[this.steps.length - 1].status = 'complete';
-                    }
                     this.result = update.data;
+                    this.answer = update.data.answer || '';
                     this.isRunning = false;
-                    if (this.ws) {
-                        this.ws.close();
-                    }
+                    this.statusMessage = '';
+                    if (this.ws) this.ws.close();
                     break;
 
                 case 'error':
-                    // Task failed
-                    if (this.steps.length > 0) {
-                        this.steps[this.steps.length - 1].status = 'error';
-                    }
                     this.error = update.data.error;
                     this.isRunning = false;
-                    if (this.ws) {
-                        this.ws.close();
-                    }
+                    this.statusMessage = '';
+                    if (this.ws) this.ws.close();
                     break;
             }
         },
@@ -583,116 +449,25 @@ function taskRunner() {
                 this.ws.close();
             }
             this.isRunning = false;
-        }
-    };
-}
-
-// Chat panel component
-function chatPanel() {
-    return {
-        showChat: true,
-        messages: [],
-        inputMessage: '',
-        isLoading: false,
-        error: null,
-        taskId: null,
-
-        init() {
-            // Get task ID from the page (will be set by parent template)
-            this.taskId = this.$el.dataset.taskId;
-
-            // Load chat history if available
-            this.loadChatHistory();
+            this.statusMessage = 'Stopped';
         },
 
-        async loadChatHistory() {
-            if (!this.taskId) return;
-
+        formatMarkdown(text) {
+            if (!text) return '';
             try {
-                const response = await fetch(`/api/tasks/${this.taskId}/chat`);
-                if (response.ok) {
-                    const data = await response.json();
-                    this.messages = data.messages || [];
-                    this.$nextTick(() => this.scrollToBottom());
-                }
+                return marked.parse(text);
             } catch (e) {
-                console.error('Failed to load chat history:', e);
+                return text.replace(/\n/g, '<br>');
             }
-        },
-
-        async sendMessage() {
-            if (!this.inputMessage.trim() || this.isLoading || !this.taskId) return;
-
-            const userMessage = this.inputMessage.trim();
-            this.inputMessage = '';
-            this.error = null;
-
-            // Add user message to UI
-            this.messages.push({
-                id: Date.now(),
-                role: 'user',
-                content: userMessage,
-                timestamp: new Date().toISOString()
-            });
-
-            this.$nextTick(() => this.scrollToBottom());
-            this.isLoading = true;
-
-            try {
-                const response = await fetch(`/api/tasks/${this.taskId}/chat`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        message: userMessage
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Failed to send message: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-
-                // Add assistant response to UI
-                this.messages.push({
-                    id: Date.now() + 1,
-                    role: 'assistant',
-                    content: data.response,
-                    timestamp: new Date().toISOString()
-                });
-
-                this.$nextTick(() => this.scrollToBottom());
-            } catch (e) {
-                console.error('Error sending message:', e);
-                this.error = e.message || 'Failed to send message. Please try again.';
-            } finally {
-                this.isLoading = false;
-            }
-        },
-
-        toggleChat() {
-            this.showChat = !this.showChat;
         },
 
         scrollToBottom() {
-            const container = this.$refs.messagesContainer;
-            if (container) {
-                container.scrollTop = container.scrollHeight;
-            }
-        },
-
-        formatTime(timestamp) {
-            const date = new Date(timestamp);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffMins = Math.floor(diffMs / 60000);
-
-            if (diffMins < 1) return 'Just now';
-            if (diffMins < 60) return `${diffMins}m ago`;
-            if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-            return date.toLocaleString();
+            this.$nextTick(() => {
+                const container = document.getElementById('messages');
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            });
         }
     };
 }

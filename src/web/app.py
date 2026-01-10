@@ -94,7 +94,7 @@ def create_app() -> FastAPI:
 
     @app.get("/", tags=["UI"])
     async def index(request: Request):
-        """Render the main UI page."""
+        """Render the main UI page (simplified chat interface)."""
         return templates.TemplateResponse(request, "index.html")
 
     @app.get("/configs", tags=["UI"])

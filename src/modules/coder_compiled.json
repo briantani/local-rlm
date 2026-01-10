@@ -4,16 +4,32 @@
     "train": [],
     "demos": [
       {
-        "task": "Read 'data.csv' and print the columns.",
+        "augmented": true,
+        "task": "Read 'data.csv' and print the column names.",
         "context_summary": "AVAILABLE FILES: [FILE] data.csv",
-        "expected_output": "Columns:"
+        "reasoning": "To read a CSV file and print its column names, we can use Python's `pandas` library. If `pandas` is not installed, we need to install it first using the appropriate method.",
+        "python_code": "import pandas as pd\ndf = pd.read_csv('data.csv')\nprint(df.columns)"
       },
       {
-        "task": "Check the formula in cell E5 of 'dataset.xlsx'.",
-        "context_summary": "AVAILABLE FILES: [FILE] dataset.xlsx",
-        "reasoning": "To get the formula, I need to load the workbook with openpyxl WITHOUT data_only=True (default). Then I access the cell's .value property, which contains the formula string if it is a formula.",
-        "python_code": "import openpyxl\nwb = openpyxl.load_workbook('dataset.xlsx')\nprint(wb.active['E5'].value)",
-        "expected_output": "=SUM(A1:A5)"
+        "augmented": true,
+        "task": "Calculate the 50th Fibonacci number.",
+        "context_summary": "",
+        "reasoning": "To calculate the 50th Fibonacci number, we can use an iterative approach. This method is efficient and avoids the potential stack overflow issues that can arise from a recursive solution.",
+        "python_code": "def fibonacci(n):\n    if n <= 1:\n        return n\n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n\nfib_50 = fibonacci(50)\nprint(fib_50)"
+      },
+      {
+        "augmented": true,
+        "task": "Find all prime numbers less than 100.",
+        "context_summary": "",
+        "reasoning": "To find all prime numbers less than 100, we can use a simple algorithm to check each number up to 99. A prime number is a natural number greater than 1 that has no positive divisors other than 1 and itself.",
+        "python_code": "def is_prime(num):\n    if num <= 1:\n        return False\n    for i in range(2, int(num**0.5) + 1):\n        if num % i == 0:\n            return False\n    return True\n\nprime_numbers = [num for num in range(2, 100) if is_prime(num)]\nprint(prime_numbers)"
+      },
+      {
+        "augmented": true,
+        "task": "Calculate the standard deviation of the data.",
+        "context_summary": "Previous execution:\ndf = pd.read_csv('data.csv')\nColumns: ['id', 'value', 'category']",
+        "reasoning": "To calculate the standard deviation of the data in the 'value' column of the DataFrame `df`, we can use the `std()` method provided by pandas.",
+        "python_code": "import pandas as pd\n\n# Load the data from the CSV file\ndf = pd.read_csv('data.csv')\n\n# Calculate the standard deviation of the 'value' column\nstd_deviation = df['value'].std()\n\n# Print the result\nprint(f'Standard Deviation: {std_deviation}')"
       }
     ],
     "signature": {

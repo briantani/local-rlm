@@ -22,6 +22,7 @@ from src.core.agent import RLMAgent
 from src.core.budget import BudgetManager
 from src.core.config_loader import ProfileConfig
 from src.core.repl import PythonREPL
+from src.core.run_context import RunContext
 from src.rlm.services.config_service import ConfigService
 from src.rlm.services.session_service import Session
 
@@ -54,6 +55,8 @@ class TaskResult:
     completed_at: datetime
     config_name: str
     task_text: str
+    artifacts_folder: Path | None = None
+    generated_images: list[dict] = field(default_factory=list)
 
     @property
     def duration_seconds(self) -> float:
@@ -145,87 +148,103 @@ class TaskService:
         BudgetManager._clear()  # Clear singleton for fresh start
         budget_manager = BudgetManager(max_budget=config.budget.max_usd)
 
+        # Create run context for artifact management
+        run_context = RunContext()
+        logger.info(f"Artifacts folder: {run_context.artifacts_dir}")
+
         # Configure DSPy with root LM
+        # NOTE: Using context() to avoid thread-safety issues
         lm = get_lm_for_role("root", config, budget_manager=budget_manager)
-        dspy.settings.configure(lm=lm)
 
-        logger.info(f"Running task with config: {config_name}")
-        logger.info(f"Root model: {config.root.provider}/{config.root.model}")
-        logger.info(f"Budget limit: ${config.budget.max_usd:.2f}")
+        with dspy.context(lm=lm):
+            logger.info(f"Running task with config: {config_name}")
+            logger.info(f"Root model: {config.root.provider}/{config.root.model}")
+            logger.info(f"Budget limit: ${config.budget.max_usd:.2f}")
 
-        # Create agent
-        agent = RLMAgent(
-            max_steps=config.root.max_steps,
-            max_depth=config.root.max_depth,
-            root_dir=context_path,
-            config=config,
-            budget_manager=budget_manager,
-        )
-
-        # Track execution history for callbacks
-        execution_history: list[StepInfo] = []
-        step_counter = [0]  # Use list for closure mutability
-
-        # Store the original _add_history method
-        original_add_history = agent._add_history
-
-        def tracked_add_history(action: str, output: str):
-            """Wrapper to track history additions and call callback."""
-            # Call original method to add to history
-            original_add_history(action, output)
-            step_counter[0] += 1
-
-            # Determine action type
-            if action.startswith("Executed Code"):
-                action_type = "CODE"
-            elif "Delegated" in action or "DELEGATE" in action:
-                action_type = "DELEGATE"
-            elif "System" in action:
-                action_type = "INIT"
-            else:
-                action_type = "OTHER"
-
-            step_info = StepInfo(
-                step_number=step_counter[0],
-                action=action_type,
-                input_text=action,
-                output_text=output,
+            # Create agent with run context
+            agent = RLMAgent(
+                max_steps=config.root.max_steps,
+                max_depth=config.root.max_depth,
+                root_dir=context_path,
+                config=config,
+                budget_manager=budget_manager,
+                run_context=run_context,
             )
-            execution_history.append(step_info)
 
-            if on_step:
-                try:
-                    on_step(step_info)
-                except Exception as e:
-                    logger.warning(f"Step callback error: {e}")
+            # Track execution history for callbacks
+            execution_history: list[StepInfo] = []
+            step_counter = [0]  # Use list for closure mutability
 
-        # Replace the _add_history method with our tracked version
-        agent._add_history = tracked_add_history  # type: ignore
+            # Store the original _add_history method
+            original_add_history = agent._add_history
 
-        # Run task
-        answer = agent.run(task)
-        completed_at = datetime.now()
+            def tracked_add_history(action: str, output: str):
+                """Wrapper to track history additions and call callback."""
+                # Call original method to add to history
+                original_add_history(action, output)
+                step_counter[0] += 1
 
-        # Store REPL state for follow-up queries
-        if task_id:
-            with self._storage_lock:
-                self._repl_storage[task_id] = agent.repl
-                logger.info(f"Stored REPL state for task {task_id}")
+                # Determine action type
+                if action.startswith("Executed Code"):
+                    action_type = "CODE"
+                elif "Delegated" in action or "DELEGATE" in action:
+                    action_type = "DELEGATE"
+                elif "System" in action:
+                    action_type = "INIT"
+                else:
+                    action_type = "OTHER"
 
-        # Get cost breakdown
-        breakdown = budget_manager.get_breakdown()
-        total_cost = budget_manager.current_cost
+                step_info = StepInfo(
+                    step_number=step_counter[0],
+                    action=action_type,
+                    input_text=action,
+                    output_text=output,
+                )
+                execution_history.append(step_info)
 
-        return TaskResult(
-            answer=answer,
-            execution_history=execution_history,
-            total_cost=total_cost,
-            model_breakdown=breakdown,
-            started_at=started_at,
-            completed_at=completed_at,
-            config_name=config_name,
-            task_text=task,
-        )
+                if on_step:
+                    try:
+                        on_step(step_info)
+                    except Exception as e:
+                        logger.warning(f"Step callback error: {e}")
+
+            # Replace the _add_history method with our tracked version
+            agent._add_history = tracked_add_history  # type: ignore
+
+            # Run task
+            answer = agent.run(task)
+            completed_at = datetime.now()
+
+            # Store REPL state for follow-up queries
+            if task_id:
+                with self._storage_lock:
+                    self._repl_storage[task_id] = agent.repl
+                    logger.info(f"Stored REPL state for task {task_id}")
+
+            # Get cost breakdown
+            breakdown = budget_manager.get_breakdown()
+            total_cost = budget_manager.current_cost
+
+            # Save report to artifacts folder
+            run_context.add_to_report(f"# Task: {task}\n\n")
+            run_context.add_to_report(f"## Answer\n\n{answer}\n\n")
+            run_context.add_to_report(f"## Cost\n\n- Total: ${total_cost:.4f}\n")
+            run_context.add_to_report(f"- Duration: {(completed_at - started_at).total_seconds():.2f}s\n")
+            run_context.add_to_report(f"- Steps: {len(execution_history)}\n")
+            run_context.save_report()
+
+            return TaskResult(
+                answer=answer,
+                execution_history=execution_history,
+                total_cost=total_cost,
+                model_breakdown=breakdown,
+                started_at=started_at,
+                completed_at=completed_at,
+                config_name=config_name,
+                task_text=task,
+                artifacts_folder=run_context.artifacts_dir,
+                generated_images=run_context.list_images(),
+            )
 
     def _get_api_keys(self) -> dict[str, str]:
         """
