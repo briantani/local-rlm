@@ -128,6 +128,21 @@ class MockREPL:
             "output_length": len(output),
         })
 
+    def get_history_metadata(self) -> str:
+        """Paper-style: Return metadata about history, NOT full content."""
+        total_chars = sum(len(e["code"]) + len(e["output"]) for e in self._execution_history)
+        return f"Execution History: {len(self._execution_history)} steps, {total_chars} chars total."
+
+    def get_last_output_preview(self, max_chars: int = 500) -> str:
+        """Return truncated preview of last execution output."""
+        if not self._execution_history:
+            return ""
+        last = self._execution_history[-1]
+        output = last["output"]
+        if len(output) > max_chars:
+            output = output[:max_chars] + "..."
+        return f"Last output ({last['output_length']} chars): {output}"
+
 
 class MockPrediction:
     """Generic mock prediction object with dynamic attributes."""

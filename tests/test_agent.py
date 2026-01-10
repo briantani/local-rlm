@@ -180,3 +180,161 @@ async def test_agent_simple_answer(setup_dspy_ollama):
 
     # It might decide to code or answer, but usually answer for this.
     # If it codes, that's fine too, but let's check basic sanity.
+
+
+# ============================================================================
+# PAPER-STYLE METADATA TESTS (MIT RLM Paper Implementation)
+# ============================================================================
+
+class TestPaperStyleContextHandling:
+    """Tests for the paper-style metadata approach that prevents context overflow."""
+
+    def test_format_context_metadata_empty(self):
+        """Test metadata format when no execution history exists."""
+        agent = RLMAgent(max_steps=3)
+        metadata = agent.format_context_metadata()
+
+        # Should contain basic info, not be empty
+        assert "Execution History" in metadata or "0 steps" in metadata
+
+    def test_format_context_metadata_with_history(self):
+        """Test metadata accurately reflects execution history."""
+        mock_repl = MockREPL(output="42")
+        agent = RLMAgent(max_steps=3, repl=mock_repl)
+
+        # Simulate execution history
+        mock_repl.add_history_entry("x = 1", "1", step=1)
+        mock_repl.add_history_entry("y = 2", "22", step=2)
+
+        metadata = agent.format_context_metadata()
+        assert "2 steps" in metadata
+        assert "chars" in metadata
+
+    def test_format_context_metadata_excludes_full_content(self):
+        """Critical: Metadata must NOT contain actual execution content."""
+        mock_repl = MockREPL(output="X" * 10000)
+        agent = RLMAgent(max_steps=3, repl=mock_repl)
+
+        # Add large content to history
+        mock_repl.add_history_entry("big_code", "X" * 10000, step=1)
+
+        metadata = agent.format_context_metadata()
+        # Metadata should be short, not contain the 10KB
+        assert len(metadata) < 500
+        assert "XXXXXXXXXX" not in metadata  # Full content should NOT be present
+
+    def test_get_last_output_preview_empty(self):
+        """Test preview returns empty when no history."""
+        mock_repl = MockREPL(output="")
+        agent = RLMAgent(max_steps=3, repl=mock_repl)
+
+        preview = agent.get_last_output_preview()
+        assert preview == ""
+
+    def test_get_last_output_preview_with_history(self):
+        """Test preview includes truncated last output."""
+        mock_repl = MockREPL(output="result")
+        agent = RLMAgent(max_steps=3, repl=mock_repl)
+
+        mock_repl.add_history_entry("print(42)", "42", step=1)
+
+        preview = agent.get_last_output_preview()
+        assert "42" in preview
+
+    def test_architect_receives_metadata_not_full_context(self):
+        """Test that Architect receives metadata, not full execution content."""
+        large_output = "Y" * 5000
+        mock_repl = MockREPL(output=large_output)
+
+        # Track what architect receives
+        architect_inputs = []
+        def tracking_architect(**kwargs):
+            architect_inputs.append(kwargs)
+            return type('Pred', (), {'action': 'ANSWER'})()
+
+        mock_architect = type('Mock', (), {'__call__': lambda self, **kw: tracking_architect(**kw)})()
+        mock_responder = MockResponder(response="Done")
+
+        agent = RLMAgent(
+            max_steps=3,
+            architect=mock_architect,
+            responder=mock_responder,
+            repl=mock_repl,
+        )
+
+        # Pre-populate history with large content
+        mock_repl.add_history_entry("code", large_output, step=1)
+
+        agent.run("Test query")
+
+        # Architect should have received metadata, not the 5KB output
+        assert len(architect_inputs) >= 1
+        data_desc = architect_inputs[0].get('data_desc', '')
+        assert len(data_desc) < 1000  # Should be much smaller than 5KB
+        assert "YYYYY" not in data_desc or len(data_desc) < 1000  # Not full content
+
+    def test_coder_receives_metadata_not_full_context(self):
+        """Test that Coder receives metadata, not full execution content."""
+        large_output = "Z" * 5000
+        mock_repl = MockREPL(output=large_output)
+
+        # Track what coder receives
+        coder_inputs = []
+        def tracking_coder(**kwargs):
+            coder_inputs.append(kwargs)
+            return type('Pred', (), {'python_code': 'print(1)'})()
+
+        mock_coder = type('Mock', (), {'__call__': lambda self, **kw: tracking_coder(**kw)})()
+        mock_responder = MockResponder(response="Done")
+
+        # Architect returns CODE first, then ANSWER
+        call_count = [0]
+        def dynamic_architect(**kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return type('Pred', (), {'action': 'CODE'})()
+            return type('Pred', (), {'action': 'ANSWER'})()
+
+        mock_architect = type('Mock', (), {'__call__': lambda self, **kw: dynamic_architect(**kw)})()
+
+        agent = RLMAgent(
+            max_steps=3,
+            architect=mock_architect,
+            coder=mock_coder,
+            responder=mock_responder,
+            repl=mock_repl,
+        )
+
+        # Pre-populate history with large content
+        mock_repl.add_history_entry("code", large_output, step=1)
+
+        agent.run("Test query")
+
+        # Coder should have received metadata, not the 5KB output
+        assert len(coder_inputs) >= 1
+        context_summary = coder_inputs[0].get('context_summary', '')
+        assert len(context_summary) < 1000  # Should be much smaller than 5KB
+
+    def test_context_overflow_prevention(self):
+        """Integration test: Verify large history doesn't overflow context."""
+        mock_repl = MockREPL(output="ok")
+
+        # Simulate many steps with large outputs
+        for i in range(20):
+            mock_repl.add_history_entry(f"step_{i}", "X" * 1000, step=i + 1)
+
+        # Total content: 20 * 1000 = 20KB
+        # Metadata should still be tiny
+        mock_responder = MockResponder(response="Final answer")
+        mock_architect = MockArchitect(action="ANSWER")
+
+        agent = RLMAgent(
+            max_steps=3,
+            architect=mock_architect,
+            responder=mock_responder,
+            repl=mock_repl,
+        )
+
+        metadata = agent.format_context_metadata()
+        assert len(metadata) < 500  # Metadata stays small regardless of history size
+        assert "20 steps" in metadata  # But accurately reflects the count

@@ -7,13 +7,24 @@ from src.core.module_loader import load_compiled_module
 
 class ArchitectSignature(dspy.Signature):
     """
-    decides the best action to take for a given query.
-    1. 'CODE': For math, data processing, logic puzzles, or whenever the user asks for code/Python. CRITICAL: If the user asks about the *content* of a file listed in 'data_desc', you MUST choose 'CODE' to read it. You cannot know the content otherwise.
-    2. 'ANSWER': For general knowledge, chit-chat, or IF the answer is EXPLICITLY visible in 'data_desc' (e.g. under "Output:"). Do NOT generate code if the output is already there.
-    3. 'DELEGATE': Exclusively when the user's task explicitly asks to "run in parallel", "split the task", or "delegate", AND the subtasks have not been executed yet.
+    Decides the best action to take for a given query.
+
+    CRITICAL (Paper-style): You receive METADATA about execution history, not full content.
+    Full content is accessible in code via __execution_history__ variable.
+
+    Actions:
+    1. 'CODE': For math, data processing, file reading, web search, or to analyze data.
+       Use llm_query() in code to analyze large chunks of data.
+       Use __execution_history__ to access previous outputs programmatically.
+    2. 'ANSWER': ONLY when the answer is clearly visible in the last output preview,
+       OR you have enough information from previous steps to formulate a complete response.
+    3. 'DELEGATE': Only when task explicitly asks to "run in parallel" or "split the task".
+
+    IMPORTANT: If data_desc shows execution history but you need to PROCESS or ANALYZE
+    the outputs (not just report them), choose CODE to work with __execution_history__.
     """
     query = dspy.InputField(desc="The user's query or task.")
-    data_desc = dspy.InputField(desc="Description of available data or context.", default="")
+    data_desc = dspy.InputField(desc="Metadata about execution history (step count, char totals) and last output preview. Full data accessible via __execution_history__ in code.", default="")
     action = dspy.OutputField(desc="Reply with exactly one word: ANSWER, CODE, or DELEGATE.")
 
 class Architect(dspy.Module):

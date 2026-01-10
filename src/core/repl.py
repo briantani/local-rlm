@@ -102,19 +102,63 @@ class PythonREPL:
         # Update the global reference
         self.globals["__execution_history__"] = self._execution_history
 
-    def get_history_summary(self) -> str:
-        """Get a summary of execution history for context."""
-        if not self._execution_history:
-            return "No execution history yet."
+    def get_history_metadata(self) -> str:
+        """Get metadata about execution history (paper-style: LLM sees metadata, not full context).
 
-        summary = f"Execution History ({len(self._execution_history)} steps):\n"
+        This is the key insight from the MIT RLM paper: instead of passing full context
+        to the LLM, we pass only metadata. The LLM accesses actual content via code:
+            for entry in __execution_history__:
+                chunk = entry['output'][:5000]
+                summary = llm_query("Summarize", chunk)
+        """
+        if not self._execution_history:
+            return "Execution History: 0 steps. No code executed yet."
+
+        total_chars = sum(len(e["code"]) + len(e["output"]) for e in self._execution_history)
+        step_summaries = []
+
         for entry in self._execution_history:
-            code_preview = entry["code"][:100] + "..." if len(entry["code"]) > 100 else entry["code"]
-            output_preview = entry["output"][:100] + "..." if len(entry["output"]) > 100 else entry["output"]
-            summary += f"\n--- Step {entry['step']} ---\n"
-            summary += f"Code: {code_preview}\n"
-            summary += f"Output ({entry['output_length']} chars): {output_preview}\n"
-        return summary
+            # Only show first 80 chars of output as preview
+            output_preview = entry["output"][:80].replace("\n", " ")
+            if len(entry["output"]) > 80:
+                output_preview += "..."
+            step_summaries.append(
+                f"  Step {entry['step']}: {entry['output_length']} chars output"
+            )
+
+        # Keep step summaries concise - only show last 5 steps in detail
+        if len(step_summaries) > 5:
+            shown_steps = step_summaries[-5:]
+            hidden_count = len(step_summaries) - 5
+            step_info = f"  ... ({hidden_count} earlier steps)\n" + "\n".join(shown_steps)
+        else:
+            step_info = "\n".join(step_summaries)
+
+        return (
+            f"Execution History: {len(self._execution_history)} steps, {total_chars} chars total.\n"
+            f"Access via __execution_history__ in code. Recent steps:\n{step_info}\n"
+            f"Use llm_query() on chunks to analyze long outputs."
+        )
+
+    def get_last_output_preview(self, max_chars: int = 500) -> str:
+        """Get a preview of the last execution output.
+
+        Used to give the Architect a hint about what just happened without
+        including the full output in the prompt.
+        """
+        if not self._execution_history:
+            return ""
+
+        last = self._execution_history[-1]
+        output = last["output"]
+        if len(output) <= max_chars:
+            return f"Last output (Step {last['step']}):\n{output}"
+        else:
+            return (
+                f"Last output (Step {last['step']}, {len(output)} chars, truncated):\n"
+                f"{output[:max_chars]}...\n"
+                f"[Use __execution_history__[-1]['output'] in code for full content]"
+            )
 
     def execute(self, code: str) -> str:
         """

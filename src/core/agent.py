@@ -226,7 +226,11 @@ class RLMAgent:
             return self._generate_fallback_answer(task)
 
     def format_context(self) -> str:
-        """Formats the execution history into a string context."""
+        """Formats the execution history into a string context.
+
+        DEPRECATED: This returns full context. For paper-style metadata-only
+        approach, use format_context_metadata() instead.
+        """
         with self._history_lock:
             if not self.history:
                 return ""
@@ -237,6 +241,41 @@ class RLMAgent:
             context_str += f"Input: {action_or_code}\n"
             context_str += f"Output: {output}\n"
         return context_str
+
+    def format_context_metadata(self) -> str:
+        """Get metadata about execution history (paper-style approach).
+
+        Paper insight: "Long prompts should not be fed into the neural network
+        directly but should instead be treated as part of the environment."
+
+        Returns metadata like step count and char totals, NOT full content.
+        The LLM accesses full content via __execution_history__ in code.
+        """
+        # Use REPL's metadata method if available
+        if hasattr(self.repl, 'get_history_metadata'):
+            return self.repl.get_history_metadata()
+
+        # Fallback for mocked REPLs in tests
+        with self._history_lock:
+            if not self.history:
+                return "Execution History: 0 steps. No code executed yet."
+
+            total_chars = sum(len(a) + len(o) for a, o in self.history)
+            return f"Execution History: {len(self.history)} steps, {total_chars} chars total."
+
+    def get_last_output_preview(self) -> str:
+        """Get a preview of the last output for decision making."""
+        if hasattr(self.repl, 'get_last_output_preview'):
+            return self.repl.get_last_output_preview(max_chars=500)
+
+        # Fallback for mocked REPLs
+        with self._history_lock:
+            if not self.history:
+                return ""
+            _, last_output = self.history[-1]
+            if len(last_output) <= 500:
+                return f"Last output:\n{last_output}"
+            return f"Last output ({len(last_output)} chars, truncated):\n{last_output[:500]}..."
 
     def run(self, task: str) -> str:
         """
@@ -265,13 +304,22 @@ class RLMAgent:
 
         for step in range(self.max_steps):
             logger.info(f"{indent}--- Step {step + 1} ---")
-            context = self.format_context()
+
+            # Paper-style: Pass METADATA to Architect, not full context
+            # The LLM can access full history via __execution_history__ in code
+            context_metadata = self.format_context_metadata()
+            last_output = self.get_last_output_preview()
+
+            # Combine metadata with last output preview for decision making
+            architect_context = context_metadata
+            if last_output:
+                architect_context += f"\n\n{last_output}"
 
             # 1. Architect decides what to do
             logger.debug(f"{indent}Thinking...")
             try:
-                # We interpret 'data_desc' as the current context/state
-                decision = self.architect(query=task, data_desc=context)
+                # Pass metadata, not full context (paper-style)
+                decision = self.architect(query=task, data_desc=architect_context)
                 action = decision.action.upper()
                 logger.info(f"{indent}Architect Decision: {action}")
             except Exception as e:
@@ -280,18 +328,21 @@ class RLMAgent:
 
             # 2. Execute Action
             if action == "ANSWER":
-                # Check if context is too large for direct response
-                if self.context_summarizer.should_chunk(context):
-                    logger.info(f"{indent}Context too large ({len(context)} chars). Using RAG-like summarization.")
-                    final_answer = self._summarize_with_rag(task, context, indent)
+                # For Responder, we need to build context from REPL history
+                # But use chunked summarization if it's too large
+                full_context = self.format_context()
+
+                if self.context_summarizer.should_chunk(full_context):
+                    logger.info(f"{indent}Context too large ({len(full_context)} chars). Using RAG-like summarization.")
+                    final_answer = self._summarize_with_rag(task, full_context, indent)
                 else:
-                    response = self.responder(query=task, context=context)
+                    response = self.responder(query=task, context=full_context)
                     final_answer = response.response
 
                     # Handle None response (can happen with context overflow or model issues)
                     if final_answer is None:
                         logger.warning(f"{indent}Responder returned None. Using RAG-like summarization.")
-                        final_answer = self._summarize_with_rag(task, context, indent)
+                        final_answer = self._summarize_with_rag(task, full_context, indent)
 
                 logger.info(f"{indent}Final Answer: {final_answer[:200]}..." if len(str(final_answer)) > 200 else f"{indent}Final Answer: {final_answer}")
                 return final_answer
@@ -299,7 +350,13 @@ class RLMAgent:
             elif action == "CODE":
                 logger.info(f"{indent}Generating code...")
                 try:
-                    code_pred = self.coder(task=task, context_summary=context)
+                    # For Coder, pass metadata + hints about available data
+                    # The Coder should use __execution_history__ for full content
+                    coder_context = context_metadata
+                    if last_output:
+                        coder_context += f"\n\n{last_output}"
+
+                    code_pred = self.coder(task=task, context_summary=coder_context)
                     code = code_pred.python_code
                     logger.debug(f"{indent}Code Generated:\n{code}")
 
@@ -328,7 +385,7 @@ class RLMAgent:
                 logger.info(f"{indent}Delegating task...")
                 try:
                     # 1. Break down task
-                    subtasks = self.delegator(task=task, context=context)
+                    subtasks = self.delegator(task=task, context=context_metadata)
                     logger.info(f"{indent}Subtasks identified: {subtasks}")
 
                     if not subtasks:
