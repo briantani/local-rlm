@@ -5,13 +5,19 @@ class CoderSignature(dspy.Signature):
     """
     Generates Python code to solve a specific task.
     The code should be a valid Python script that prints the final result to stdout.
-    IMPORTANT:
-    - To search the web, you MUST import `src.tools.search` and use `search_web(query)`.
-    - Do NOT use `requests` or `BeautifulSoup` directly.
+
+    CRITICAL RULES:
+    1. `search_web(query)` is PRE-LOADED. Do NOT import it. Just call it directly.
+    2. Do NOT use Jupyter syntax like `!pip install`. Only valid Python allowed.
+    3. Do NOT use `subprocess`, `os.system`, or shell commands.
+    4. Do NOT use `requests` or `BeautifulSoup` directly - use search_web instead.
+    5. Output ONLY executable Python code, no explanatory text.
+
+    Available globals: search_web, __artifacts_dir__, __context_dir__
     """
     task = dspy.InputField(desc="The task to solve using Python code.")
     context_summary = dspy.InputField(desc="Summary of previous context or variables available.", default="")
-    python_code = dspy.OutputField(desc="Executable Python code. Do not use markdown backticks. Prefer using installed tools like src.tools.search.")
+    python_code = dspy.OutputField(desc="ONLY executable Python code. No markdown, no comments explaining what you're about to do, no !pip commands.")
 
 class Coder(dspy.Module):
     def __init__(self):
@@ -43,7 +49,17 @@ class Coder(dspy.Module):
             dspy.Example(
                 task="Google who won the 2024 Super Bowl.",
                 context_summary="",
-                python_code="from src.tools.search import search_web\nresults = search_web('2024 Super Bowl winner')\nprint(results)"
+                python_code="results = search_web('2024 Super Bowl winner')\nprint(results)"
+            ).with_inputs("task", "context_summary"),
+            dspy.Example(
+                task="Create a bar chart of sales data and save it",
+                context_summary="__artifacts_dir__ = 'runs/20260109_123456'",
+                python_code="import matplotlib.pyplot as plt\n\ndata = {'Q1': 100, 'Q2': 150, 'Q3': 120, 'Q4': 180}\nplt.figure(figsize=(10, 6))\nplt.bar(data.keys(), data.values())\nplt.title('Quarterly Sales')\nplt.savefig(f'{__artifacts_dir__}/sales_chart.png')\nplt.close()\nprint('Chart saved')"
+            ).with_inputs("task", "context_summary"),
+            dspy.Example(
+                task="Search for latest AI news and summarize",
+                context_summary="",
+                python_code="results = search_web('latest AI news January 2026')\nfor r in results[:3]:\n    print(f\"- {r['title']}: {r['body'][:100]}...\")"
             ).with_inputs("task", "context_summary")
         ]
 

@@ -4,6 +4,9 @@ import os
 import traceback
 from typing import TYPE_CHECKING
 
+# Import tools to make them available in the sandbox
+from src.tools.search import search_web
+
 if TYPE_CHECKING:
     from src.core.run_context import RunContext
 
@@ -15,6 +18,9 @@ class PythonREPL:
     Provides two key directories to code:
     - __context_dir__: Where input files are (from --context flag)
     - __artifacts_dir__: Where to save output files (from run_context)
+
+    Pre-loaded functions:
+    - search_web(query): Search the web using DuckDuckGo
     """
     def __init__(
         self,
@@ -29,6 +35,9 @@ class PythonREPL:
         # Set up the directories for code execution
         self._setup_directories()
 
+        # Pre-load tools into the sandbox
+        self._preload_tools()
+
     def _setup_directories(self) -> None:
         """Set up input and output directories for code execution."""
         # Set up output directory (where files are saved)
@@ -41,6 +50,11 @@ class PythonREPL:
         # Set up input directory (where context files are)
         if self.context_dir:
             self.globals["__context_dir__"] = self.context_dir
+
+    def _preload_tools(self) -> None:
+        """Pre-load commonly used tools into the sandbox globals."""
+        # Make search_web directly available (no import needed)
+        self.globals["search_web"] = search_web
 
     def execute(self, code: str) -> str:
         """

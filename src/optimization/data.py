@@ -402,17 +402,46 @@ def get_coder_data() -> list[dspy.Example]:
 
         # =====================================================================
         # WEB SEARCH (Using project's search tool)
+        # search_web is PRE-LOADED in globals - no import needed!
         # =====================================================================
         dspy.Example(
             task="Find out who won the 2024 Super Bowl.",
             context_summary="",
-            python_code="from src.tools.search import search_web\nresults = search_web('2024 Super Bowl winner')\nprint(results)",
+            python_code="results = search_web('2024 Super Bowl winner')\nfor r in results[:3]:\n    print(f\"- {r['title']}\")",
         ).with_inputs("task", "context_summary"),
 
         dspy.Example(
             task="What is the current weather in Tokyo?",
             context_summary="",
-            python_code="from src.tools.search import search_web\nresults = search_web('Tokyo weather today')\nprint(results)",
+            python_code="results = search_web('Tokyo weather today')\nfor r in results[:3]:\n    print(f\"{r['title']}: {r['body'][:100]}\")",
+        ).with_inputs("task", "context_summary"),
+
+        dspy.Example(
+            task="Search for the latest news about AI regulation.",
+            context_summary="",
+            python_code="results = search_web('AI regulation news 2026')\nfor r in results:\n    print(f\"Title: {r['title']}\\nSnippet: {r['body'][:150]}...\\n\")",
+        ).with_inputs("task", "context_summary"),
+
+        # =====================================================================
+        # ARTIFACT SAVING PATTERNS
+        # __artifacts_dir__ is PRE-LOADED in globals
+        # =====================================================================
+        dspy.Example(
+            task="Create a pie chart of market share and save it.",
+            context_summary="",
+            python_code="import matplotlib.pyplot as plt\n\ndata = {'Company A': 35, 'Company B': 25, 'Company C': 20, 'Others': 20}\nplt.figure(figsize=(8, 8))\nplt.pie(data.values(), labels=data.keys(), autopct='%1.1f%%')\nplt.title('Market Share Distribution')\nplt.savefig(f'{__artifacts_dir__}/market_share.png')\nplt.close()\nprint('Chart saved to artifacts directory')",
+        ).with_inputs("task", "context_summary"),
+
+        dspy.Example(
+            task="Generate a timeline chart of AI model releases.",
+            context_summary="",
+            python_code="import matplotlib.pyplot as plt\nimport pandas as pd\n\ndata = {\n    'Model': ['GPT-3', 'DALL-E', 'GPT-4', 'Claude 3', 'GPT-5'],\n    'Year': [2020, 2021, 2023, 2024, 2025]\n}\ndf = pd.DataFrame(data)\n\nplt.figure(figsize=(12, 4))\nplt.barh(df['Model'], df['Year'], color='steelblue')\nplt.xlabel('Release Year')\nplt.title('Major AI Model Releases')\nplt.tight_layout()\nplt.savefig(f'{__artifacts_dir__}/ai_timeline.png')\nplt.close()\nprint('Timeline saved')",
+        ).with_inputs("task", "context_summary"),
+
+        dspy.Example(
+            task="Save the search results to a markdown report.",
+            context_summary="Previous execution: results = search_web('AI breakthroughs 2025')",
+            python_code="# results already available from previous step\nreport = '# AI Breakthroughs 2025\\n\\n'\nfor r in results:\n    report += f\"## {r['title']}\\n{r['body']}\\n\\n\"\n\nwith open(f'{__artifacts_dir__}/ai_report.md', 'w') as f:\n    f.write(report)\nprint('Report saved to ai_report.md')",
         ).with_inputs("task", "context_summary"),
 
         # =====================================================================
@@ -482,6 +511,46 @@ def get_coder_data() -> list[dspy.Example]:
             task="Calculate the number of days between the first and last date in dates.csv.",
             context_summary="AVAILABLE FILES: [FILE] dates.csv",
             python_code="import pandas as pd\ndf = pd.read_csv('dates.csv', parse_dates=['date'])\ndays_diff = (df['date'].max() - df['date'].min()).days\nprint(f'Days between first and last: {days_diff}')",
+        ).with_inputs("task", "context_summary"),
+
+        # =====================================================================
+        # ANTI-PATTERNS: Things the model should NOT do
+        # These examples show CORRECT alternatives to forbidden patterns
+        # =====================================================================
+
+        # NEVER use Jupyter magic commands
+        dspy.Example(
+            task="Install pandas and use it to read a CSV file.",
+            context_summary="",
+            python_code="# pandas is already installed, just import and use it\nimport pandas as pd\ndf = pd.read_csv('data.csv')\nprint(df.head())",
+        ).with_inputs("task", "context_summary"),
+
+        # NEVER use subprocess or os.system
+        dspy.Example(
+            task="Get system CPU information.",
+            context_summary="",
+            python_code="import platform\nimport os\n\nprint(f'Platform: {platform.system()}')\nprint(f'Processor: {platform.processor()}')\nprint(f'Architecture: {platform.machine()}')\nprint(f'CPU count: {os.cpu_count()}')",
+        ).with_inputs("task", "context_summary"),
+
+        # NEVER use requests directly - use search_web
+        dspy.Example(
+            task="Fetch data from an external API.",
+            context_summary="",
+            python_code="# Use search_web for external data instead of requests\nresults = search_web('my query')\nfor r in results[:3]:\n    print(r['title'])",
+        ).with_inputs("task", "context_summary"),
+
+        # Output ONLY code, no explanatory text
+        dspy.Example(
+            task="Create a simple calculation function.",
+            context_summary="",
+            python_code="def calculate(a, b):\n    return a + b\n\nresult = calculate(10, 20)\nprint(f'Result: {result}')",
+        ).with_inputs("task", "context_summary"),
+
+        # Use pre-loaded variables correctly
+        dspy.Example(
+            task="Save analysis results to the output folder.",
+            context_summary="data = {'accuracy': 0.95, 'precision': 0.92}",
+            python_code="import json\n\n# __artifacts_dir__ is pre-loaded, use it directly\nwith open(f'{__artifacts_dir__}/results.json', 'w') as f:\n    json.dump(data, f, indent=2)\nprint(f'Results saved to {__artifacts_dir__}/results.json')",
         ).with_inputs("task", "context_summary"),
     ]
     return dataset

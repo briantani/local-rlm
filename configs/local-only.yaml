@@ -10,7 +10,7 @@ description: |
 # Root agent configuration
 root:
   provider: ollama
-  model: qwen2.5-coder:14b  # Powerful local model
+  model: qwen2.5-coder:14b
   max_steps: 24
   max_depth: 10
   pricing:
@@ -20,7 +20,7 @@ root:
 # Delegate agent configuration
 delegate:
   provider: ollama
-  model: qwen2.5-coder:7b  # Lighter model for sub-tasks
+  model: qwen2.5-coder:14b
   max_steps: 12
   max_depth: 1
   pricing:
@@ -48,7 +48,7 @@ modules:
   # Responder can use smaller model
   responder:
     provider: ollama
-    model: qwen2.5-coder:7b
+    model: qwen2.5-coder:14b
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
@@ -56,7 +56,7 @@ modules:
   # Delegator uses smaller model
   delegator:
     provider: ollama
-    model: qwen2.5-coder:7b
+    model: qwen2.5-coder:14b
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
