@@ -1409,14 +1409,16 @@ src/web/
 ### **📝 Implementation Details**
 
 **REPL Persistence Architecture:**
-- `TaskService._repl_storage`: Class-level dict mapping task_id → PythonREPL
-- `TaskService._storage_lock`: Threading lock for thread-safe access
-- `run_task(task_id=...)`: Stores REPL after task completion
-- `run_followup(task_id, query, config)`: Retrieves stored REPL, runs query, updates REPL
-- `has_repl_state(task_id)`: Check if REPL exists
-- `clear_repl_state(task_id)`: Manual cleanup
+
+* `TaskService._repl_storage`: Class-level dict mapping task_id → PythonREPL
+* `TaskService._storage_lock`: Threading lock for thread-safe access
+* `run_task(task_id=...)`: Stores REPL after task completion
+* `run_followup(task_id, query, config)`: Retrieves stored REPL, runs query, updates REPL
+* `has_repl_state(task_id)`: Check if REPL exists
+* `clear_repl_state(task_id)`: Manual cleanup
 
 **Chat Flow:**
+
 1. User completes task → REPL state stored with task_id
 2. Chat panel appears with message history from database
 3. User sends follow-up query → `POST /api/tasks/{task_id}/chat`
@@ -1425,10 +1427,11 @@ src/web/
 6. Response saved to database and returned to UI
 
 **Notes:**
-- Fixed Jinja2 RecursionError by moving `<script>` tag from component to parent template
-- All 144 tests passing (4 skipped)
-- REPL state is in-memory only (cleared on server restart)
-- Session required for chat (validates task's session_id)
+
+* Fixed Jinja2 RecursionError by moving `<script>` tag from component to parent template
+* All 144 tests passing (4 skipped)
+* REPL state is in-memory only (cleared on server restart)
+* Session required for chat (validates task's session_id)
 
 ---
 
