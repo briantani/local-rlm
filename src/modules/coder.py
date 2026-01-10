@@ -8,12 +8,28 @@ class CoderSignature(dspy.Signature):
 
     CRITICAL RULES:
     1. `search_web(query)` is PRE-LOADED. Do NOT import it. Just call it directly.
-    2. Do NOT use Jupyter syntax like `!pip install`. Only valid Python allowed.
-    3. Do NOT use `subprocess`, `os.system`, or shell commands.
-    4. Do NOT use `requests` or `BeautifulSoup` directly - use search_web instead.
-    5. Output ONLY executable Python code, no explanatory text.
+    2. `llm_query(question, context)` is PRE-LOADED for recursive LLM calls on chunks.
+    3. Do NOT use Jupyter syntax like `!pip install`. Only valid Python allowed.
+    4. Do NOT use `subprocess`, `os.system`, or shell commands.
+    5. Do NOT use `requests` or `BeautifulSoup` directly - use search_web instead.
+    6. Output ONLY executable Python code, no explanatory text.
 
-    Available globals: search_web, __artifacts_dir__, __context_dir__
+    AVAILABLE GLOBALS:
+    - search_web(query) - Search the web
+    - llm_query(question, context_chunk) - Ask LLM about a chunk of text
+    - __artifacts_dir__ - Directory to save output files
+    - __context_dir__ - Directory with input files
+    - __execution_history__ - List of previous execution steps (code, output)
+    - __task__ - The original task string
+
+    LARGE CONTEXT STRATEGY (from MIT RLM paper):
+    When dealing with large data, use llm_query to process chunks:
+        # Process chunks and aggregate
+        results = []
+        for chunk in large_text.split('\\n\\n'):
+            summary = llm_query("Summarize key points", chunk)
+            results.append(summary)
+        print("\\n".join(results))
     """
     task = dspy.InputField(desc="The task to solve using Python code.")
     context_summary = dspy.InputField(desc="Summary of previous context or variables available.", default="")
@@ -60,7 +76,28 @@ class Coder(dspy.Module):
                 task="Search for latest AI news and summarize",
                 context_summary="",
                 python_code="results = search_web('latest AI news January 2026')\nfor r in results[:3]:\n    print(f\"- {r['title']}: {r['body'][:100]}...\")"
-            ).with_inputs("task", "context_summary")
+            ).with_inputs("task", "context_summary"),
+            # Paper-inspired: llm_query for processing chunks
+            dspy.Example(
+                task="Summarize each section of the document",
+                context_summary="large_text variable has 50000 characters of document content",
+                python_code="sections = large_text.split('\\n\\n')\nsummaries = []\nfor i, section in enumerate(sections[:10]):\n    summary = llm_query(f'Summarize section {i+1}', section)\n    summaries.append(f'Section {i+1}: {summary}')\nprint('\\n'.join(summaries))"
+            ).with_inputs("task", "context_summary"),
+            dspy.Example(
+                task="Extract all dates mentioned in the research papers",
+                context_summary="papers_text contains 100000 chars of research paper text",
+                python_code="# Process in chunks to avoid context overflow\nchunk_size = 10000\nall_dates = []\nfor i in range(0, len(papers_text), chunk_size):\n    chunk = papers_text[i:i+chunk_size]\n    dates = llm_query('List all dates mentioned (YYYY-MM-DD format)', chunk)\n    all_dates.append(dates)\nprint('Found dates:\\n' + '\\n'.join(all_dates))"
+            ).with_inputs("task", "context_summary"),
+            dspy.Example(
+                task="Classify each entry in the data",
+                context_summary="entries is a list of 1000 text entries to classify",
+                python_code="# Batch classify entries using llm_query\nclassifications = []\nfor entry in entries[:20]:  # Process first 20\n    label = llm_query('Classify as: positive, negative, or neutral', entry)\n    classifications.append({'text': entry[:50], 'label': label})\nfor c in classifications:\n    print(f\"{c['label']}: {c['text']}...\")"
+            ).with_inputs("task", "context_summary"),
+            dspy.Example(
+                task="Aggregate findings from execution history",
+                context_summary="Multiple search results in __execution_history__",
+                python_code="# Access previous execution results\nfindings = []\nfor entry in __execution_history__:\n    if 'search' in entry['code'].lower():\n        finding = llm_query('Extract key facts', entry['output'])\n        findings.append(finding)\nprint('Aggregated findings:')\nfor f in findings:\n    print(f'- {f}')"
+            ).with_inputs("task", "context_summary"),
         ]
 
     def forward(self, task: str, context_summary: str = "") -> dspy.Prediction:

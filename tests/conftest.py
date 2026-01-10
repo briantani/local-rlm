@@ -107,11 +107,26 @@ class MockREPL:
         self.output = output
         self.call_count = 0
         self.executed_code: list[str] = []
+        self._execution_history: list[dict] = []
+        self._task = ""
 
     def execute(self, code: str) -> str:
         self.call_count += 1
         self.executed_code.append(code)
         return self.output
+
+    def set_task(self, task: str) -> None:
+        """Set the current task (paper-style interface)."""
+        self._task = task
+
+    def add_history_entry(self, code: str, output: str, step: int) -> None:
+        """Add an execution history entry (paper-style interface)."""
+        self._execution_history.append({
+            "step": step,
+            "code": code,
+            "output": output,
+            "output_length": len(output),
+        })
 
 
 class MockPrediction:

@@ -86,11 +86,13 @@ class RLMAgent:
         self.root_dir = Path(root_dir) if root_dir else None
 
         # Use injected dependencies or create defaults
-        # Pass run_context to REPL so files are saved to artifacts folder
+        # Pass run_context so files are saved to artifacts folder
         # Pass root_dir as context_dir so code can access input files
+        # Pass budget_manager for llm_query cost tracking
         self.repl = repl if repl else PythonREPL(
             run_context=run_context,
             context_dir=str(self.root_dir.absolute()) if self.root_dir else None,
+            budget_manager=budget_manager,
         )
         self.architect = architect if architect else Architect()
         self.coder = coder if coder else Coder()
@@ -258,6 +260,9 @@ class RLMAgent:
 
     def _run_loop(self, task: str, indent: str) -> str:
         """Internal run loop, separated to support dspy.context() wrapper."""
+        # Set the task in REPL so code can access it via __task__
+        self.repl.set_task(task)
+
         for step in range(self.max_steps):
             logger.info(f"{indent}--- Step {step + 1} ---")
             context = self.format_context()
@@ -303,7 +308,9 @@ class RLMAgent:
                     log_msg = f"{indent}Execution Output (truncated): {output[:100]}..." if len(output) > 100 else f"{indent}Execution Output: {output}"
                     logger.info(log_msg)
 
+                    # Add to both internal history and REPL-accessible history
                     self._add_history(f"Executed Code:\n{code}", output)
+                    self.repl.add_history_entry(code, output, step + 1)
 
                 except Exception as e:
                     error_msg = f"Error during coding/execution: {e}"
