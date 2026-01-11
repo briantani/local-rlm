@@ -11,7 +11,7 @@ The agent operates in a **recursive decision loop**:
 
 1. **Architect** (`src/modules/architect.py`) decides: ANSWER, CODE, or DELEGATE
 2. **Coder** (`src/modules/coder.py`) generates Python when CODE is chosen
-3. **REPL** (`src/core/repl.py`) executes code in a persistent sandbox
+3. **REPL** (`src/core/repl.py`) executes code in a RestrictedPython sandbox
 4. **Responder** (`src/modules/responder.py`) formats final answers
 5. **Delegator** (`src/modules/delegator.py`) spawns parallel sub-agents for DELEGATE
 
@@ -27,7 +27,7 @@ The project uses a **service layer pattern** to share business logic between CLI
 
 ### Critical Components
 
-- **`src/core/repl.py`**: Stateful Python sandbox. Variables MUST persist across `execute()` calls. Uses `exec()` with shared `globals`/`locals` dicts.
+- **`src/core/repl.py`**: RestrictedPython sandbox for code execution. Pre-loads data science libraries (numpy, pandas, matplotlib, seaborn, scipy, sklearn, statsmodels) and document processing (pdfplumber, docx, openpyxl). Uses `_write_`, `_inplacevar_` guards for secure assignment operations.
 - **`src/core/budget.py`**: Thread-safe singleton tracking token usage per model. **CRITICAL**: Uses `threading.Lock` - Python 3.14t has true parallelism (no GIL).
 - **`src/core/config_loader.py`**: YAML-based multi-model configuration. Root agent can use GPT-5, delegates use GPT-5-mini, Coder uses Ollama, etc.
 - **`src/core/agent.py`**: Main orchestrator. Implements recursive delegation with depth limits. Uses Protocol-based dependency injection for testing.
@@ -58,6 +58,18 @@ tests/        # Pytest suite (mirrors src structure, uses conftest.py for mocks)
 - **Web Stack**: FastAPI + HTMX + Alpine.js + Tailwind (Phase 13+)
 - **Persistence**: SQLite for task history (Phase 13+)
 - **Concurrency**: **ALWAYS** use `threading` or `ThreadPoolExecutor`. **NEVER** use `multiprocessing` (unnecessary in 3.14t).
+
+### Dependency Groups
+
+Dependencies are organized in `pyproject.toml`:
+
+- **Core dependencies**: DSPy, FastAPI, LLM providers, RestrictedPython
+- **`repl` group**: Libraries pre-loaded in the sandbox for code execution:
+  - Data Science: numpy, pandas, scipy, matplotlib, seaborn
+  - Machine Learning: scikit-learn, statsmodels, pytorch
+  - Document Processing: pdfplumber, pypdf, python-docx, openpyxl
+  - Report Generation: markdown, weasyprint
+- **`dev` group**: Testing tools (pytest, playwright)
 
 ## 🚀 Developer Workflow
 

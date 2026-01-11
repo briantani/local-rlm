@@ -86,11 +86,13 @@ def _setup_test_globals(repl: PythonREPL) -> None:
     """
     Set up paper-style globals for code validation.
 
-    Creates mock versions of __execution_history__, llm_query, etc.
-    so that paper-style code examples can execute during optimization.
+    Creates mock versions of execution history, llm_query, etc.
+    so that code examples can execute during optimization.
+
+    Includes both underscore variables (for compatibility) and simple aliases.
     """
     # Mock execution history with sample data
-    repl.globals["__execution_history__"] = [
+    mock_history = [
         {
             "step": 1,
             "code": "results = search_web('AI research')",
@@ -105,14 +107,31 @@ def _setup_test_globals(repl: PythonREPL) -> None:
         },
     ]
 
+    # Set both underscore and simple alias versions
+    repl.globals["__execution_history__"] = mock_history
+    repl.globals["history"] = mock_history  # Simple alias
+
     # Mock llm_query function
     def mock_llm_query(query: str, context: str = "") -> str:
         """Mock llm_query that returns a reasonable placeholder."""
         return f"[LLM Response to: {query[:50]}...]"
 
     repl.globals["llm_query"] = mock_llm_query
+
+    # Task variable - both underscore and simple alias
     repl.globals["__task__"] = "Test task for optimization"
+    repl.globals["task"] = "Test task for optimization"  # Simple alias
+
+    # Output directory - both underscore and simple alias
     repl.globals["__artifacts_dir__"] = "/tmp/test_artifacts"
+    repl.globals["output_dir"] = "/tmp/test_artifacts"  # Simple alias
+
+    # Input/context directory
+    repl.globals["__context_dir__"] = "/tmp/test_context"
+    repl.globals["input_dir"] = "/tmp/test_context"  # Simple alias
+
+    # Context variable (empty by default)
+    repl.globals["context"] = ""
 
 
 def validate_code_execution(example, prediction, trace=None) -> float:

@@ -4,36 +4,58 @@
     "train": [],
     "demos": [
       {
-        "augmented": true,
-        "task": "Read 'data.csv' and print the column names.",
-        "context_summary": "AVAILABLE FILES: [FILE] data.csv",
-        "reasoning": "To read a CSV file and print its column names, we can use Python's `pandas` library. If `pandas` is not installed, we need to install it first using the appropriate method.",
-        "python_code": "import pandas as pd\ndf = pd.read_csv('data.csv')\nprint(df.columns)"
+        "task": "Save results to the output directory",
+        "context_summary": "output_dir = '/tmp/output'",
+        "python_code": "# CORRECT: Use 'output_dir' not '__artifacts_dir__'\nresults = {'score': 0.95, 'accuracy': 0.92}\nwith open(f'{output_dir}/results.json', 'w') as f:\n    json.dump(results, f, indent=2)\nprint(f'Saved to {output_dir}/results.json')"
       },
       {
-        "augmented": true,
-        "task": "Calculate the 50th Fibonacci number.",
+        "task": "Answer the original question using collected data",
+        "context_summary": "Execution History: 6 steps, 45000 chars total.",
+        "python_code": "# Use 'history' and 'task' simple aliases\nrelevant = []\nfor entry in history:\n    if entry['output_length'] > 100:\n        relevant.append(f\"Step {entry['step']}:\\n{entry['output'][:5000]}\")\n\ncontext_str = '\\n\\n---\\n\\n'.join(relevant)\nanswer = llm_query(f'Based on this research, answer: {task}', context_str[:50000])\nprint(answer)"
+      },
+      {
+        "task": "Read a Word document and extract paragraphs",
+        "context_summary": "AVAILABLE FILES: [FILE] report.docx",
+        "python_code": "# docx is pre-loaded - NO imports\ndoc = docx.Document(f'{input_dir}/report.docx')\nparagraphs = [p.text for p in doc.paragraphs if p.text.strip()]\nprint(f'Found {len(paragraphs)} paragraphs')\nfor i, p in enumerate(paragraphs[:5]):\n    print(f'{i+1}. {p[:100]}...')"
+      },
+      {
+        "task": "Calculate compound interest",
         "context_summary": "",
-        "reasoning": "To calculate the 50th Fibonacci number, we can use an iterative approach. This method is efficient and avoids the potential stack overflow issues that can arise from a recursive solution.",
-        "python_code": "def fibonacci(n):\n    if n <= 1:\n        return n\n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n\nfib_50 = fibonacci(50)\nprint(fib_50)"
+        "python_code": "# math is pre-loaded - NO imports\nprincipal = 10000\nrate = 0.05\nyears = 10\nfinal = principal * math.pow(1 + rate, years)\nprint(f'Principal: ${principal:,}')\nprint(f'Rate: {rate*100}%')\nprint(f'Years: {years}')\nprint(f'Final amount: ${final:,.2f}')"
       },
       {
-        "augmented": true,
-        "task": "Find all prime numbers less than 100.",
+        "task": "Create a bar chart of quarterly sales and save it",
+        "context_summary": "output_dir = '/tmp/output'",
+        "python_code": "# plt is pre-loaded - NO imports\ndata = {'Q1': 100, 'Q2': 150, 'Q3': 120, 'Q4': 180}\nplt.figure(figsize=(10, 6))\nplt.bar(data.keys(), data.values(), color='steelblue')\nplt.title('Quarterly Sales')\nplt.ylabel('Sales ($K)')\nplt.savefig(f'{output_dir}/sales_chart.png', dpi=100)\nplt.close()\nprint(f'Chart saved to {output_dir}/sales_chart.png')"
+      },
+      {
+        "task": "Find all email addresses in the document",
+        "context_summary": "Execution History: 1 step. Last output: document text...",
+        "python_code": "# re is pre-loaded, history is the simple alias for execution history\ntext = history[-1]['output'] if history else 'test@example.com'\nemails = re.findall(r'[\\w.+-]+@[\\w-]+\\.[\\w.-]+', text)\nprint(f'Found {len(emails)} emails:')\nfor email in emails:\n    print(f'  - {email}')"
+      },
+      {
+        "task": "Create a correlation heatmap for the data",
+        "context_summary": "output_dir = '/tmp/output'",
+        "python_code": "# sns (seaborn) is pre-loaded - NO imports\ndata = pd.DataFrame(np.random.randn(50, 4), columns=['A', 'B', 'C', 'D'])\nplt.figure(figsize=(8, 6))\nsns.heatmap(data.corr(), annot=True, cmap='coolwarm', center=0)\nplt.title('Correlation Heatmap')\nplt.tight_layout()\nplt.savefig(f'{output_dir}/heatmap.png')\nplt.close()\nprint('Heatmap saved')"
+      },
+      {
+        "task": "Count word frequencies in text",
         "context_summary": "",
-        "reasoning": "To find all prime numbers less than 100, we can use a simple algorithm to check each number up to 99. A prime number is a natural number greater than 1 that has no positive divisors other than 1 and itself.",
-        "python_code": "def is_prime(num):\n    if num <= 1:\n        return False\n    for i in range(2, int(num**0.5) + 1):\n        if num % i == 0:\n            return False\n    return True\n\nprime_numbers = [num for num in range(2, 100) if is_prime(num)]\nprint(prime_numbers)"
+        "python_code": "# Counter is pre-loaded - NO imports\ntext = 'the quick brown fox jumps over the lazy dog the fox is quick'\nwords = text.lower().split()\nword_counts = Counter(words)\nprint('Word frequencies:')\nfor word, count in word_counts.most_common(5):\n    print(f'  {word}: {count}')"
       },
       {
-        "augmented": true,
-        "task": "Calculate the standard deviation of the data.",
-        "context_summary": "Previous execution:\ndf = pd.read_csv('data.csv')\nColumns: ['id', 'value', 'category']",
-        "reasoning": "To calculate the standard deviation of the data in the 'value' column of the DataFrame `df`, we can use the `std()` method provided by pandas.",
-        "python_code": "import pandas as pd\n\n# Load the data from the CSV file\ndf = pd.read_csv('data.csv')\n\n# Calculate the standard deviation of the 'value' column\nstd_deviation = df['value'].std()\n\n# Print the result\nprint(f'Standard Deviation: {std_deviation}')"
+        "task": "Get the last execution output",
+        "context_summary": "Execution History: 3 steps.",
+        "python_code": "# CORRECT: Use 'history' not '__execution_history__'\nlast_output = history[-1]['output'] if history else 'No history'\nprint(f'Last output ({len(last_output)} chars):')\nprint(last_output[:500])"
+      },
+      {
+        "task": "Convert data to JSON and save it",
+        "context_summary": "output_dir = '/tmp/output'",
+        "python_code": "# json is pre-loaded - NO imports\ndata = {'name': 'Report', 'values': [1, 2, 3], 'meta': {'version': '1.0'}}\nwith open(f'{output_dir}/data.json', 'w') as f:\n    json.dump(data, f, indent=2)\nprint('JSON saved')\nprint(json.dumps(data, indent=2))"
       }
     ],
     "signature": {
-      "instructions": "Generates Python code to solve a specific task.\nThe code should be a valid Python script that prints the final result to stdout.\nIMPORTANT:\n- To search the web, you MUST import `src.tools.search` and use `search_web(query)`.\n- Do NOT use `requests` or `BeautifulSoup` directly.",
+      "instructions": "Generates Python code to solve a specific task.\nThe code should be a valid Python script that prints the final result to stdout.\n\nCRITICAL RULES:\n1. Do NOT use `import` statements - ALL modules are PRE-LOADED as globals.\n2. Do NOT use Jupyter syntax like `!pip install`. Only valid Python allowed.\n3. Do NOT use `subprocess`, `os.system`, or shell commands.\n4. Output ONLY executable Python code, no explanatory text.\n\nPRE-LOADED DATA SCIENCE MODULES (use directly, no import needed):\n- np / numpy - NumPy for numerical operations\n- pd / pandas - Pandas for data manipulation and analysis\n- plt / matplotlib - Matplotlib for plotting (use plt.savefig(), NOT plt.show())\n- sns / seaborn - Seaborn for statistical visualization\n- scipy / scipy_stats - SciPy for scientific computing and statistics\n- sklearn - Scikit-learn (LinearRegression, LogisticRegression, KMeans, StandardScaler, sklearn_metrics)\n- sm / statsmodels - Statsmodels for statistical analysis and regression\n\nPRE-LOADED DOCUMENT PROCESSING:\n- pdfplumber - Extract text and tables from PDFs: pdfplumber.open(path)\n- pypdf - PDF manipulation and reading\n- docx - Read/write Word documents: docx.Document(path)\n- openpyxl - Read/write Excel files (used by pandas for .xlsx)\n\nPRE-LOADED UTILITIES:\n- re - Regular expressions\n- json - JSON parsing\n- math - Math functions\n- datetime, timedelta - Date/time handling\n- Counter, defaultdict - Collection utilities\n\nPRE-LOADED FUNCTIONS:\n- search_web(query) - Search the web and get results\n- llm_query(question, context_chunk) - Ask LLM about a chunk (~500K char limit per call)\n\nAVAILABLE VARIABLES:\n- output_dir - Directory to save output files (e.g., plt.savefig(f'{output_dir}/chart.png'))\n- input_dir - Directory with input files (from --context flag)\n- history - List of previous execution steps: [{\"step\": 1, \"code\": \"...\", \"output\": \"...\", \"output_length\": 123}, ...]\n- task - The original task string\n- context - Last execution output (shortcut for history[-1]['output'])\n\nMATPLOTLIB/SEABORN USAGE:\n- Use `plt.savefig(f'{output_dir}/filename.png')` to save charts\n- Always call `plt.close()` after saving to free memory\n- Backend is 'Agg' (non-interactive, file-only)\n\nEXAMPLE - Data Analysis with Visualization:\n    # Generate data\n    data = pd.DataFrame({'x': np.random.randn(100), 'y': np.random.randn(100)})\n\n    # Create visualization with seaborn\n    plt.figure(figsize=(10, 6))\n    sns.scatterplot(data=data, x='x', y='y')\n    plt.title('Scatter Plot')\n    plt.savefig(f'{output_dir}/scatter.png')\n    plt.close()\n\n    # Statistical analysis\n    correlation = scipy_stats.pearsonr(data['x'], data['y'])\n    print(f'Correlation: {correlation[0]:.3f}, p-value: {correlation[1]:.3f}')\n\nEXAMPLE - Machine Learning:\n    # Simple linear regression\n    X = np.array([[1], [2], [3], [4]])\n    y = np.array([2, 4, 6, 8])\n    model = LinearRegression()\n    model.fit(X, y)\n    print(f'Coefficient: {model.coef_[0]:.2f}, Intercept: {model.intercept_:.2f}')",
       "fields": [
         {
           "prefix": "Task:",
@@ -41,7 +63,7 @@
         },
         {
           "prefix": "Context Summary:",
-          "description": "Summary of previous context or variables available."
+          "description": "Metadata about execution history (step count, output sizes). Use history variable in code for full content."
         },
         {
           "prefix": "Reasoning: Let's think step by step in order to",
@@ -49,7 +71,7 @@
         },
         {
           "prefix": "Python Code:",
-          "description": "Executable Python code. Do not use markdown backticks. Prefer using installed tools like src.tools.search."
+          "description": "ONLY executable Python code. No markdown, no import statements, no comments explaining what you're about to do, no !pip commands."
         }
       ]
     },

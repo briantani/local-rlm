@@ -6,6 +6,7 @@ from src.core.config_loader import (
     ProfileConfig,
     get_model_config_for_role,
 )
+from src.core.prompts import build_coder_system_prompt
 
 load_dotenv()
 
@@ -58,12 +59,18 @@ def get_lm_for_role(
         output_price_per_1m=model_config.pricing.output_per_1m,
     )
 
+    # For the coder role, add the system prompt with RestrictedPython constraints
+    system_prompt = None
+    if role == "coder":
+        system_prompt = build_coder_system_prompt()
+
     # Create the LM using the existing factory logic
     return _create_lm(
         provider=model_config.provider,
         model=model_config.model,
         budget_manager=budget_manager,
         model_id=model_config.model_id,
+        system_prompt=system_prompt,
     )
 
 
@@ -72,6 +79,7 @@ def _create_lm(
     model: str,
     budget_manager: BudgetManager,
     model_id: str | None = None,
+    system_prompt: str | None = None,
 ) -> dspy.LM:
     """
     Internal factory to create a dspy.LM instance.
@@ -81,11 +89,15 @@ def _create_lm(
         model: Model name
         budget_manager: BudgetManager instance
         model_id: Optional model ID for budget tracking
+        system_prompt: Optional system prompt to prepend to all calls
 
     Returns:
         A dspy.LM instance wrapped with BudgetWrapper
     """
     lm = None
+    extra_kwargs = {}
+    if system_prompt:
+        extra_kwargs["system_prompt"] = system_prompt
 
     match provider.lower():
         case "gemini":
@@ -97,7 +109,7 @@ def _create_lm(
             if not target_model.startswith("gemini/"):
                 target_model = f"gemini/{target_model}"
 
-            lm = dspy.LM(target_model, api_key=api_key)
+            lm = dspy.LM(target_model, api_key=api_key, **extra_kwargs)
 
         case "openai":
             api_key = os.getenv("OPENAI_API_KEY")
@@ -111,16 +123,17 @@ def _create_lm(
             # Support custom base URL (for Fireworks, Together, etc.)
             base_url = os.getenv("OPENAI_BASE_URL")
             if base_url:
-                lm = dspy.LM(target_model, api_key=api_key, api_base=base_url)
+                lm = dspy.LM(target_model, api_key=api_key, api_base=base_url, **extra_kwargs)
             else:
-                lm = dspy.LM(target_model, api_key=api_key)
+                lm = dspy.LM(target_model, api_key=api_key, **extra_kwargs)
 
         case "ollama":
             target_model = model
             if not target_model.startswith("ollama/"):
                 target_model = f"ollama/{target_model}"
 
-            lm = dspy.LM(target_model, api_base="http://localhost:11434")
+            # Disable caching for Ollama to ensure fresh responses
+            lm = dspy.LM(target_model, api_base="http://localhost:11434", cache=False, **extra_kwargs)
 
         case _:
             raise ValueError(f"Unsupported provider: {provider}")

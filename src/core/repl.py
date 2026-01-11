@@ -7,6 +7,92 @@ from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from typing import TYPE_CHECKING, Any
 
+# Data science libraries (pre-loaded for code execution)
+try:
+    import numpy as np
+    import pandas as pd
+    import matplotlib
+    matplotlib.use('Agg')  # Non-interactive backend for saving files
+    import matplotlib.pyplot as plt
+    HAS_DATA_SCIENCE_LIBS = True
+except ImportError:
+    np = None
+    pd = None
+    plt = None
+    HAS_DATA_SCIENCE_LIBS = False
+
+# Extended data science libraries
+try:
+    import seaborn as sns
+    HAS_SEABORN = True
+except ImportError:
+    sns = None
+    HAS_SEABORN = False
+
+try:
+    import scipy
+    from scipy import stats as scipy_stats
+    HAS_SCIPY = True
+except ImportError:
+    scipy = None
+    scipy_stats = None
+    HAS_SCIPY = False
+
+try:
+    import sklearn
+    from sklearn import (
+        linear_model as sklearn_linear,
+        cluster as sklearn_cluster,
+        preprocessing as sklearn_preprocessing,
+        metrics as sklearn_metrics,
+    )
+    HAS_SKLEARN = True
+except ImportError:
+    sklearn = None
+    sklearn_linear = None
+    sklearn_cluster = None
+    sklearn_preprocessing = None
+    sklearn_metrics = None
+    HAS_SKLEARN = False
+
+try:
+    import statsmodels
+    import statsmodels.api as sm
+    HAS_STATSMODELS = True
+except ImportError:
+    statsmodels = None
+    sm = None
+    HAS_STATSMODELS = False
+
+# Document processing libraries
+try:
+    import pdfplumber
+    HAS_PDFPLUMBER = True
+except ImportError:
+    pdfplumber = None
+    HAS_PDFPLUMBER = False
+
+try:
+    import pypdf
+    HAS_PYPDF = True
+except ImportError:
+    pypdf = None
+    HAS_PYPDF = False
+
+try:
+    import docx
+    HAS_DOCX = True
+except ImportError:
+    docx = None
+    HAS_DOCX = False
+
+try:
+    import openpyxl
+    HAS_OPENPYXL = True
+except ImportError:
+    openpyxl = None
+    HAS_OPENPYXL = False
+
 # RestrictedPython for safer code execution (paper-style)
 from RestrictedPython import compile_restricted_exec, safe_globals
 from RestrictedPython.Guards import (
@@ -90,6 +176,10 @@ class PythonREPL:
         # Add in-place variable helper for augmented assignment (+=, -=, etc.)
         restricted["_inplacevar_"] = self._inplacevar
 
+        # Add write guard for attribute/item assignment (obj.attr = x, obj[key] = x)
+        # This is required for operations like df['col'] = values, df.at[i, j] = val
+        restricted["_write_"] = self._write_guard
+
         # Add print collector
         restricted["_print_"] = PrintCollector
 
@@ -167,6 +257,59 @@ class PythonREPL:
             "defaultdict": defaultdict,
         })
 
+        # Add data science libraries if available
+        if HAS_DATA_SCIENCE_LIBS:
+            restricted.update({
+                "np": np,
+                "numpy": np,
+                "pd": pd,
+                "pandas": pd,
+                "plt": plt,
+                "matplotlib": matplotlib,
+            })
+
+        # Add seaborn for statistical visualization
+        if HAS_SEABORN:
+            restricted.update({
+                "sns": sns,
+                "seaborn": sns,
+            })
+
+        # Add scipy for scientific computing
+        if HAS_SCIPY:
+            restricted.update({
+                "scipy": scipy,
+                "scipy_stats": scipy_stats,  # scipy.stats
+            })
+
+        # Add scikit-learn for machine learning
+        if HAS_SKLEARN:
+            restricted.update({
+                "sklearn": sklearn,
+                "LinearRegression": sklearn_linear.LinearRegression if sklearn_linear else None,
+                "LogisticRegression": sklearn_linear.LogisticRegression if sklearn_linear else None,
+                "KMeans": sklearn_cluster.KMeans if sklearn_cluster else None,
+                "StandardScaler": sklearn_preprocessing.StandardScaler if sklearn_preprocessing else None,
+                "sklearn_metrics": sklearn_metrics,
+            })
+
+        # Add statsmodels for statistical analysis
+        if HAS_STATSMODELS:
+            restricted.update({
+                "statsmodels": statsmodels,
+                "sm": sm,  # statsmodels.api
+            })
+
+        # Add document processing libraries
+        if HAS_PDFPLUMBER:
+            restricted["pdfplumber"] = pdfplumber
+        if HAS_PYPDF:
+            restricted["pypdf"] = pypdf
+        if HAS_DOCX:
+            restricted["docx"] = docx
+        if HAS_OPENPYXL:
+            restricted["openpyxl"] = openpyxl
+
         return restricted
 
     def _setup_directories(self) -> None:
@@ -176,11 +319,19 @@ class PythonREPL:
             artifacts_dir = self.run_context.get_working_directory()
             os.makedirs(artifacts_dir, exist_ok=True)
             self.globals["__artifacts_dir__"] = artifacts_dir
+            self.globals["output_dir"] = artifacts_dir  # Simple alias for RestrictedPython
             self.globals["__run_context__"] = self.run_context
+
+            # Default input_dir to output_dir if no context_dir provided
+            # This ensures input_dir is always defined for delegates
+            if not self.context_dir:
+                self.globals["__context_dir__"] = artifacts_dir
+                self.globals["input_dir"] = artifacts_dir
 
         # Set up input directory (where context files are)
         if self.context_dir:
             self.globals["__context_dir__"] = self.context_dir
+            self.globals["input_dir"] = self.context_dir  # Simple alias for RestrictedPython
 
     def _preload_tools(self) -> None:
         """Pre-load commonly used tools into the sandbox globals."""
@@ -237,6 +388,21 @@ class PythonREPL:
             return x << y
         else:
             raise ValueError(f"Unsupported in-place operation: {op}")
+
+    @staticmethod
+    def _write_guard(obj: Any) -> Any:
+        """Guard for write operations in RestrictedPython.
+
+        RestrictedPython rewrites attribute/item assignment to use _write_:
+            obj.attr = val  ->  _write_(obj).attr = val
+            obj[key] = val  ->  _write_(obj)[key] = val
+
+        We allow writes to most objects but could add restrictions here.
+        For pandas DataFrames/Series, numpy arrays, dicts, lists - we allow writes.
+        """
+        # Allow writes to common data types used in data science
+        # Could add restrictions here if needed for security
+        return obj
 
     def set_task(self, task: str) -> None:
         """Set the current task so code can access it via __task__ or task."""

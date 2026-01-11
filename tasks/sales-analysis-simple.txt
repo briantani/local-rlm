@@ -1,0 +1,55 @@
+# Sales Data Analysis Task
+
+## Objective
+Create a simple sales performance analysis with visualizations and summary tables.
+
+## Task Description
+Generate a synthetic quarterly sales dataset for a company with 4 product categories, then analyze and visualize the data.
+
+## Deliverables
+
+### 1. Data Generation
+Create synthetic sales data with:
+- 4 quarters (Q1-Q4 2025)
+- 4 product categories (Electronics, Clothing, Home, Food)
+- Random but realistic sales figures ($50K-$500K per category per quarter)
+- Include growth/decline patterns
+
+### 2. Summary Table
+Create a markdown table showing:
+- Quarterly sales by product category
+- Row totals (category totals)
+- Column totals (quarterly totals)
+- Grand total
+
+### 3. Visualizations
+Generate and save TWO charts:
+
+**Chart 1: Bar Chart**
+- Grouped bar chart showing quarterly sales by category
+- Clear labels and legend
+- Save as `quarterly_sales.png`
+
+**Chart 2: Pie Chart**
+- Total annual sales distribution by category
+- Show percentages
+- Save as `category_distribution.png`
+
+### 4. Key Insights
+Write 3-5 bullet points summarizing:
+- Best performing category
+- Best performing quarter
+- Notable trends
+
+## Output Format
+Produce a markdown report with:
+- Data table (the raw data)
+- Summary statistics table
+- Embedded references to the PNG charts
+- Key insights section
+
+## Success Criteria
+- Both charts must be saved as PNG files
+- Tables must have correct totals (verify math)
+- Report must be well-formatted markdown
+- Insights must be consistent with the data shown

@@ -416,6 +416,7 @@ class RLMAgent:
                         for i, subtask in enumerate(subtasks):
                             # Instantiate new agent for each subtask
                             # Pass config, run_context, and mark as delegate
+                            # Share root_dir so delegates have input_dir defined
                             sub_agent = RLMAgent(
                                 max_steps=self.max_steps,
                                 max_depth=self.max_depth,
@@ -424,6 +425,7 @@ class RLMAgent:
                                 is_delegate=True,
                                 budget_manager=self.budget_manager,
                                 run_context=self.run_context,  # Share artifact folder
+                                root_dir=self.root_dir,  # Share input directory
                             )
                             futures[executor.submit(sub_agent.run, subtask)] = subtask
 

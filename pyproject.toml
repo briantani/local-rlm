@@ -1,44 +1,63 @@
 [project]
 name = "local-rlm"
 version = "0.1.0"
-description = "Add your description here"
+description = "Recursive Language Model (RLM) Agent - An implementation of MIT CSAIL's recursive problem-solving architecture using DSPy. Solves complex tasks by generating and executing Python code in a stateful sandbox with support for delegation to parallel sub-agents."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "aiosqlite>=0.22.1",
-    "chromadb>=0.3.23",
-    "ddgs>=9.10.0",
+    # Core Framework
     "dspy-ai>=3.0.4",
-    "fastapi>=0.128.0",
-    "google-generativeai>=0.8.6",
-    "ipykernel>=7.1.0",
-    "ipython>=9.9.0",
-    "markdown>=3.7",
-    "matplotlib>=3.9.0",
-    "nbconvert>=7.16.6",
-    "notebook>=7.5.1",
-    "openai>=2.14.0",
-    "openpyxl>=3.1.5",
-    "weasyprint>=63.1",
-    "pandas>=2.3.3",
-    "pdfplumber>=0.11.9",
-    "pypdf>=6.5.0",
-    "python-docx>=1.2.0",
     "python-dotenv>=1.2.1",
-    "python-multipart>=0.0.21",
-    "seaborn>=0.13.0",
+    "restrictedpython>=8.1",
+
+    # LLM Providers
+    "google-generativeai>=0.8.6",
+    "openai>=2.14.0",
+
+    # Web Framework (for future web UI)
+    "fastapi>=0.128.0",
     "uvicorn[standard]>=0.40.0",
+    "python-multipart>=0.0.21",
     "websockets>=15.0.1",
+    "aiosqlite>=0.22.1",
+
+    # Web Search
+    "ddgs>=9.10.0",
+]
+
+# Libraries available in the REPL sandbox for code execution
+# These are pre-loaded and accessible without imports in generated code
+[dependency-groups]
+repl = [
+    # Data Science Core
+    "numpy>=2.0.0",
+    "pandas>=2.3.3",
     "scipy>=1.16.3",
+
+    # Visualization
+    "matplotlib>=3.9.0",
+    "seaborn>=0.13.0",
+
+    # Machine Learning
     "scikit-learn>=1.8.0",
     "statsmodels>=0.14.6",
+
+    # Deep Learning (optional, heavy)
     "torch>=2.9.1",
     "torchvision>=0.24.1",
     "torchaudio>=2.9.1",
-    "restrictedpython>=8.1",
+
+    # Document Processing
+    "pdfplumber>=0.11.9",
+    "pypdf>=6.5.0",
+    "python-docx>=1.2.0",
+    "openpyxl>=3.1.5",
+
+    # Report Generation
+    "markdown>=3.7",
+    "weasyprint>=63.1",
 ]
 
-[dependency-groups]
 dev = [
     "playwright>=1.57.0",
     "pytest>=9.0.2",
@@ -55,6 +74,8 @@ markers = [
 ]
 filterwarnings = [
     "ignore:Pydantic serializer warnings:UserWarning",
-    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning"
+    "ignore:.*PydanticSerializationUnexpectedValue.*:UserWarning",
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning",
+    "ignore::pydantic.warnings.PydanticDeprecatedSince20",
 ]
 
