@@ -33,6 +33,10 @@ class CoderSignature(dspy.Signature):
     - math - Math functions
     - datetime, timedelta - Date/time handling
     - Counter, defaultdict - Collection utilities
+    - Path - pathlib.Path for file path handling
+    - os.path.exists(), os.path.isfile(), os.path.join() - File path utilities
+    - os.listdir() - List directory contents
+    - StringIO, BytesIO - In-memory streams
 
     PRE-LOADED FUNCTIONS:
     - search_web(query) - Search the web and get results
@@ -45,10 +49,19 @@ class CoderSignature(dspy.Signature):
     - task - The original task string
     - context - Last execution output (shortcut for history[-1]['output'])
 
+    IMPORTANT: Variables created in previous steps are available directly (shared state).
+    If step 1 created 'df = pd.DataFrame(...)', step 2 can use 'df' directly without re-reading files.
+
     MATPLOTLIB/SEABORN USAGE:
     - Use `plt.savefig(f'{output_dir}/filename.png')` to save charts
     - Always call `plt.close()` after saving to free memory
     - Backend is 'Agg' (non-interactive, file-only)
+
+    PANDAS/DATAFRAME TIPS:
+    - Use `df.to_markdown()` to format DataFrames as markdown tables (tabulate is installed)
+    - AVOID augmented assignment on DataFrame slices (e.g., `df.loc[...] *= 2`)
+    - Instead use: `df['col'] = df['col'] * 2` or create new columns
+    - Use `pd.concat()` instead of deprecated `df.append()`
 
     EXAMPLE - Data Analysis with Visualization:
         # Generate data

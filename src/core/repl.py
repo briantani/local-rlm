@@ -1,8 +1,10 @@
 import os
 import re
+import io
 import json
 import math
 import traceback
+from pathlib import Path
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from typing import TYPE_CHECKING, Any
@@ -255,7 +257,30 @@ class PythonREPL:
             "timedelta": timedelta,
             "Counter": Counter,
             "defaultdict": defaultdict,
+            "Path": Path,  # pathlib.Path for file path handling
+            "StringIO": io.StringIO,  # For in-memory text streams
+            "BytesIO": io.BytesIO,  # For in-memory binary streams
         })
+
+        # Add limited os.path functions for file checking (no system access)
+        # Create a safe os module with only path-related functions
+        class SafeOsPath:
+            """Safe subset of os.path for file operations."""
+            exists = staticmethod(os.path.exists)
+            isfile = staticmethod(os.path.isfile)
+            isdir = staticmethod(os.path.isdir)
+            join = staticmethod(os.path.join)
+            basename = staticmethod(os.path.basename)
+            dirname = staticmethod(os.path.dirname)
+            splitext = staticmethod(os.path.splitext)
+
+        class SafeOs:
+            """Safe subset of os module with only path operations."""
+            path = SafeOsPath()
+            # Add listdir for directory listing
+            listdir = staticmethod(os.listdir)
+
+        restricted["os"] = SafeOs()
 
         # Add data science libraries if available
         if HAS_DATA_SCIENCE_LIBS:
