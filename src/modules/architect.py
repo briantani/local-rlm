@@ -9,28 +9,22 @@ class ArchitectSignature(dspy.Signature):
     """
     Decides the best action to take for a given query.
 
-    CRITICAL (Paper-style): You receive METADATA about execution history, not full content.
+    You receive METADATA about execution history, not full content.
     Full content is accessible in code via __execution_history__ variable.
 
     Actions:
     1. 'CODE': For math, data processing, file reading, web search, visualizations, or to analyze data.
        Use llm_query() in code to analyze large chunks of data.
-       Use __execution_history__ to access previous outputs programmatically.
-       PREFER CODE for multi-step data tasks - data persists between steps!
+       Variables persist between CODE steps - use multiple CODE steps for complex tasks.
     2. 'ANSWER': ONLY when the answer is clearly visible in the last output preview,
        OR you have enough information from previous steps to formulate a complete response.
-    3. 'DELEGATE': ONLY when task EXPLICITLY mentions "parallel", "concurrent", or "split into subtasks".
-       DO NOT USE for data analysis tasks - use CODE instead (data is shared between CODE steps).
-       NEVER delegate tasks that have sequential dependencies (e.g., generate data → analyze data).
 
     IMPORTANT: If data_desc shows execution history but you need to PROCESS or ANALYZE
     the outputs (not just report them), choose CODE to work with __execution_history__.
-
-    ANTI-PATTERN: Do NOT delegate for tasks like "generate data and visualize" - use multiple CODE steps.
     """
     query = dspy.InputField(desc="The user's query or task.")
     data_desc = dspy.InputField(desc="Metadata about execution history (step count, char totals) and last output preview. Full data accessible via __execution_history__ in code.", default="")
-    action = dspy.OutputField(desc="Reply with exactly one word: ANSWER, CODE, or DELEGATE.")
+    action = dspy.OutputField(desc="Reply with exactly one word: ANSWER or CODE.")
 
 class Architect(dspy.Module):
     def __init__(self):
@@ -60,22 +54,8 @@ class Architect(dspy.Module):
         # Normalize and extract action from potentially verbose output
         action = self._extract_action(prediction.action)
 
-        # HEURISTIC OVERRIDE: Block DELEGATE for data analysis tasks
-        # These should use sequential CODE steps with shared state
-        if action == "DELEGATE":
-            query_lower = query.lower()
-            # Data analysis tasks should NOT be delegated - use CODE steps instead
-            data_analysis_keywords = [
-                "generate", "create", "analyze", "visualiz", "chart", "plot",
-                "table", "summary", "report", "sales", "data", "csv", "excel",
-                "synthetic", "random", "calculate", "statistic"
-            ]
-            if any(keyword in query_lower for keyword in data_analysis_keywords):
-                # Override to CODE - data analysis works better with shared state
-                action = "CODE"
-
         # DSPy Assertion: Ensure action is one of the valid enums
-        valid_actions = ["ANSWER", "CODE", "DELEGATE"]
+        valid_actions = ["ANSWER", "CODE"]
         if action not in valid_actions:
             raise ValueError(f"Invalid action '{action}'. Must be one of {valid_actions}")
 
@@ -91,7 +71,7 @@ class Architect(dspy.Module):
             raw_action: The raw model output that may contain verbose text.
 
         Returns:
-            One of "ANSWER", "CODE", or "DELEGATE". Defaults to "ANSWER" for
+            One of "ANSWER" or "CODE". Defaults to "ANSWER" for
             ambiguous cases since the model has provided some response.
         """
         # Handle empty/whitespace input
@@ -101,7 +81,7 @@ class Architect(dspy.Module):
         text = raw_action.upper().strip()
 
         # If it's already a clean action, return it
-        valid_actions = ["ANSWER", "CODE", "DELEGATE"]
+        valid_actions = ["ANSWER", "CODE"]
         if text in valid_actions:
             return text
 
@@ -111,7 +91,6 @@ class Architect(dspy.Module):
                 return action
 
         # Search for action words anywhere in the text using word boundaries
-        # Prioritize ANSWER > CODE > DELEGATE in case of multiple matches
         found_actions = []
         for action in valid_actions:
             # Use word boundary matching to find complete words
@@ -136,12 +115,6 @@ class Architect(dspy.Module):
                         "RUN CODE", "PROGRAM", "ALGORITHM", "ANALYZE"]
         if any(word in text for word in code_keywords):
             return "CODE"
-
-        # Check for patterns indicating DELEGATE
-        delegate_keywords = ["SPLIT", "PARALLEL", "SUBTASK", "BREAK DOWN",
-                            "DIVIDE", "DIVIDED", "MULTIPLE TASKS", "DECOMPOSE"]
-        if any(word in text for word in delegate_keywords):
-            return "DELEGATE"
 
         # Check for patterns indicating ANSWER
         answer_keywords = ["EXPLAIN", "DESCRIBE", "SUMMARIZE", "THE ANSWER IS",
