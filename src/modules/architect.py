@@ -7,23 +7,15 @@ from src.core.module_loader import load_compiled_module
 
 class ArchitectSignature(dspy.Signature):
     """
-    Decides the best action to take for a given query.
+    Decide: CODE or ANSWER?
 
-    You receive METADATA about execution history, not full content.
-    Full content is accessible in code via __execution_history__ variable.
+    CODE: For computation, file reading, data analysis, web search, or visualization.
+    ANSWER: When the answer is clearly visible in the last output.
 
-    Actions:
-    1. 'CODE': For math, data processing, file reading, web search, visualizations, or to analyze data.
-       Use llm_query() in code to analyze large chunks of data.
-       Variables persist between CODE steps - use multiple CODE steps for complex tasks.
-    2. 'ANSWER': ONLY when the answer is clearly visible in the last output preview,
-       OR you have enough information from previous steps to formulate a complete response.
-
-    IMPORTANT: If data_desc shows execution history but you need to PROCESS or ANALYZE
-    the outputs (not just report them), choose CODE to work with __execution_history__.
+    If unsure, choose CODE.
     """
     query = dspy.InputField(desc="The user's query or task.")
-    data_desc = dspy.InputField(desc="Metadata about execution history (step count, char totals) and last output preview. Full data accessible via __execution_history__ in code.", default="")
+    data_desc = dspy.InputField(desc="Execution history metadata and last output preview.", default="")
     action = dspy.OutputField(desc="Reply with exactly one word: ANSWER or CODE.")
 
 class Architect(dspy.Module):
@@ -31,16 +23,36 @@ class Architect(dspy.Module):
         super().__init__()
         self.decide = dspy.ChainOfThought(ArchitectSignature)
 
-        # Few-shot examples (for future compilation/optimization)
+        # Few-shot examples guide the model on when to use CODE vs ANSWER
         self.examples = [
+            # Simple factual questions → ANSWER
             dspy.Example(
                 query="What is the capital of France?",
                 data_desc="",
                 action="ANSWER"
             ).with_inputs("query", "data_desc"),
+            # Math/computation → CODE
             dspy.Example(
                 query="Calculate the 100th Fibonacci number.",
                 data_desc="",
+                action="CODE"
+            ).with_inputs("query", "data_desc"),
+            # Data analysis → CODE
+            dspy.Example(
+                query="Analyze the sales data and create a chart.",
+                data_desc="",
+                action="CODE"
+            ).with_inputs("query", "data_desc"),
+            # After successful computation → ANSWER
+            dspy.Example(
+                query="What is 2+2?",
+                data_desc="Execution History: 1 step.\nLast output: 4",
+                action="ANSWER"
+            ).with_inputs("query", "data_desc"),
+            # Need more processing → CODE
+            dspy.Example(
+                query="Summarize this CSV file.",
+                data_desc="Execution History: 1 step.\nLast output: DataFrame with 1000 rows loaded.",
                 action="CODE"
             ).with_inputs("query", "data_desc"),
         ]
