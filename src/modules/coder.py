@@ -3,92 +3,25 @@ import ast
 
 class CoderSignature(dspy.Signature):
     """
-    Generates Python code to solve a specific task.
-    The code should be a valid Python script that prints the final result to stdout.
+    Generate Python code to solve the task. Print results to stdout.
 
-    CRITICAL RULES:
-    1. Do NOT use `import` statements - ALL modules are PRE-LOADED as globals.
-    2. Do NOT use Jupyter syntax like `!pip install`. Only valid Python allowed.
-    3. Do NOT use `subprocess`, `os.system`, or shell commands.
-    4. Output ONLY executable Python code, no explanatory text.
+    RULES:
+    - NO import statements - all modules are pre-loaded
+    - NO subprocess, os.system, or shell commands
+    - Use plt.savefig(), NOT plt.show()
 
-    PRE-LOADED DATA SCIENCE MODULES (use directly, no import needed):
-    - np / numpy - NumPy for numerical operations
-    - pd / pandas - Pandas for data manipulation and analysis
-    - plt / matplotlib - Matplotlib for plotting (use plt.savefig(), NOT plt.show())
-    - sns / seaborn - Seaborn for statistical visualization
-    - scipy / scipy_stats - SciPy for scientific computing and statistics
-    - sklearn - Scikit-learn (LinearRegression, LogisticRegression, KMeans, StandardScaler, sklearn_metrics)
-    - sm / statsmodels - Statsmodels for statistical analysis and regression
+    PRE-LOADED: np, pd, plt, sns, scipy_stats, sklearn, re, json, math, datetime,
+    Path, os.path, openpyxl, pdfplumber, docx, Counter, defaultdict, StringIO
 
-    PRE-LOADED DOCUMENT PROCESSING:
-    - pdfplumber - Extract text and tables from PDFs: pdfplumber.open(path)
-    - pypdf - PDF manipulation and reading
-    - docx - Read/write Word documents: docx.Document(path)
-    - openpyxl - Read/write Excel files (used by pandas for .xlsx)
+    VARIABLES: output_dir, input_dir, history, task, context
 
-    PRE-LOADED UTILITIES:
-    - re - Regular expressions
-    - json - JSON parsing
-    - math - Math functions
-    - datetime, timedelta - Date/time handling
-    - Counter, defaultdict - Collection utilities
-    - Path - pathlib.Path for file path handling
-    - os.path.exists(), os.path.isfile(), os.path.join() - File path utilities
-    - os.listdir() - List directory contents
-    - StringIO, BytesIO - In-memory streams
+    FUNCTIONS: search_web(query), llm_query(question, text)
 
-    PRE-LOADED FUNCTIONS:
-    - search_web(query) - Search the web and get results
-    - llm_query(question, context_chunk) - Ask LLM about a chunk (~500K char limit per call)
-
-    AVAILABLE VARIABLES:
-    - output_dir - Directory to save output files (e.g., plt.savefig(f'{output_dir}/chart.png'))
-    - input_dir - Directory with input files (from --context flag)
-    - history - List of previous execution steps: [{"step": 1, "code": "...", "output": "...", "output_length": 123}, ...]
-    - task - The original task string
-    - context - Last execution output (shortcut for history[-1]['output'])
-
-    IMPORTANT: Variables created in previous steps are available directly (shared state).
-    If step 1 created 'df = pd.DataFrame(...)', step 2 can use 'df' directly without re-reading files.
-
-    MATPLOTLIB/SEABORN USAGE:
-    - Use `plt.savefig(f'{output_dir}/filename.png')` to save charts
-    - Always call `plt.close()` after saving to free memory
-    - Backend is 'Agg' (non-interactive, file-only)
-
-    PANDAS/DATAFRAME TIPS:
-    - Use `df.to_markdown()` to format DataFrames as markdown tables (tabulate is installed)
-    - AVOID augmented assignment on DataFrame slices (e.g., `df.loc[...] *= 2`)
-    - Instead use: `df['col'] = df['col'] * 2` or create new columns
-    - Use `pd.concat()` instead of deprecated `df.append()`
-
-    EXAMPLE - Data Analysis with Visualization:
-        # Generate data
-        data = pd.DataFrame({'x': np.random.randn(100), 'y': np.random.randn(100)})
-
-        # Create visualization with seaborn
-        plt.figure(figsize=(10, 6))
-        sns.scatterplot(data=data, x='x', y='y')
-        plt.title('Scatter Plot')
-        plt.savefig(f'{output_dir}/scatter.png')
-        plt.close()
-
-        # Statistical analysis
-        correlation = scipy_stats.pearsonr(data['x'], data['y'])
-        print(f'Correlation: {correlation[0]:.3f}, p-value: {correlation[1]:.3f}')
-
-    EXAMPLE - Machine Learning:
-        # Simple linear regression
-        X = np.array([[1], [2], [3], [4]])
-        y = np.array([2, 4, 6, 8])
-        model = LinearRegression()
-        model.fit(X, y)
-        print(f'Coefficient: {model.coef_[0]:.2f}, Intercept: {model.intercept_:.2f}')
+    Variables from previous steps persist - reuse them directly.
     """
-    task = dspy.InputField(desc="The task to solve using Python code.")
-    context_summary = dspy.InputField(desc="Metadata about execution history (step count, output sizes). Use history variable in code for full content.", default="")
-    python_code = dspy.OutputField(desc="ONLY executable Python code. No markdown, no import statements, no comments explaining what you're about to do, no !pip commands.")
+    task = dspy.InputField(desc="The task to solve with Python code.")
+    context_summary = dspy.InputField(desc="Execution history metadata.", default="")
+    python_code = dspy.OutputField(desc="Executable Python code only. No markdown, no imports.")
 
 class Coder(dspy.Module):
     def __init__(self):
