@@ -48,34 +48,34 @@ def create_lm(provider: str) -> dspy.LM:
 def strict_action_metric(example, prediction, trace=None) -> float:
     """
     Strict metric that only accepts exact action words.
-    
+
     Scoring:
     - 1.0: Exact match (e.g., "ANSWER" == "ANSWER")
     - 0.5: Correct action but with extra text (e.g., "ANSWER: because..." contains "ANSWER")
     - 0.0: Wrong action or no valid action found
-    
+
     This teaches the model to be concise.
     """
     valid_actions = {"ANSWER", "CODE"}
     expected = example.action.upper().strip()
-    
+
     # Handle both Prediction object and dict
     if isinstance(prediction, dict):
         predicted_raw = prediction.get("action", "")
     else:
         predicted_raw = getattr(prediction, "action", "")
-    
+
     predicted = predicted_raw.upper().strip()
-    
+
     # Perfect match - exactly one word
     if predicted in valid_actions and predicted == expected:
         return 1.0
-    
+
     # Check if the correct action is at the start
     if predicted.startswith(expected):
         # Penalize for extra content
         return 0.5
-    
+
     # Check if action appears anywhere (very lenient)
     for action in valid_actions:
         if re.search(rf'\b{action}\b', predicted):
@@ -83,7 +83,7 @@ def strict_action_metric(example, prediction, trace=None) -> float:
                 return 0.3  # Found it but with noise
             else:
                 return 0.0  # Wrong action
-    
+
     # No valid action found at all
     return 0.0
 
@@ -91,7 +91,7 @@ def strict_action_metric(example, prediction, trace=None) -> float:
 def format_strictness_metric(example, prediction, trace=None) -> float:
     """
     Metric that heavily penalizes verbose outputs.
-    
+
     Returns:
     - 1.0: Single word response matching action
     - 0.7: Correct action at start with minimal extra text
@@ -100,24 +100,24 @@ def format_strictness_metric(example, prediction, trace=None) -> float:
     """
     valid_actions = {"ANSWER", "CODE"}
     expected = example.action.upper().strip()
-    
+
     if isinstance(prediction, dict):
         predicted_raw = prediction.get("action", "")
     else:
         predicted_raw = getattr(prediction, "action", "")
-    
+
     predicted = predicted_raw.strip()
     predicted_upper = predicted.upper()
-    
+
     # Best case: exactly one word
     if predicted_upper in valid_actions:
         return 1.0 if predicted_upper == expected else 0.0
-    
+
     # Check for numbered lists or steps (bad pattern)
     if re.match(r'^\d+\.', predicted) or "STEP" in predicted_upper:
         # This is the verbose failure pattern we want to fix
         return 0.0
-    
+
     # Check if it starts with the action
     if predicted_upper.startswith(expected):
         # How much extra content?
@@ -128,11 +128,11 @@ def format_strictness_metric(example, prediction, trace=None) -> float:
             return 0.5  # Moderate extra text
         else:
             return 0.2  # Way too verbose
-    
+
     # Action appears but not at start
     if re.search(rf'\b{expected}\b', predicted_upper):
         return 0.3
-    
+
     return 0.0
 
 
@@ -144,7 +144,7 @@ class StrictArchitect(dspy.Module):
         super().__init__()
         # Use a signature with very explicit format instructions
         self.decide = dspy.ChainOfThought(ArchitectSignature)
-    
+
     def forward(self, query: str, data_desc: str = "") -> dspy.Prediction:
         prediction = self.decide(query=query, data_desc=data_desc)
         return prediction
@@ -153,22 +153,22 @@ class StrictArchitect(dspy.Module):
 def run_optimization(provider: str, optimizer_type: str, num_demos: int = 4):
     """Run the optimization process."""
     logger.info(f"Starting optimization with {provider} using {optimizer_type}")
-    
+
     # Setup LM
     lm = create_lm(provider)
     dspy.settings.configure(lm=lm)
-    
+
     # Load data
     all_data = get_architect_data()
     logger.info(f"Loaded {len(all_data)} training examples")
-    
+
     # Split data
     trainset, valset = split_train_val(all_data, val_ratio=0.3)
     logger.info(f"Train: {len(trainset)}, Val: {len(valset)}")
-    
+
     # Create module to optimize
     architect = StrictArchitect()
-    
+
     # Choose optimizer
     if optimizer_type == "bootstrap":
         optimizer = BootstrapFewShot(
@@ -178,7 +178,7 @@ def run_optimization(provider: str, optimizer_type: str, num_demos: int = 4):
             max_rounds=2,
         )
         compiled = optimizer.compile(architect, trainset=trainset)
-        
+
     elif optimizer_type == "mipro":
         optimizer = MIPROv2(
             metric=format_strictness_metric,
@@ -186,8 +186,8 @@ def run_optimization(provider: str, optimizer_type: str, num_demos: int = 4):
             init_temperature=1.0,
         )
         compiled = optimizer.compile(
-            architect, 
-            trainset=trainset, 
+            architect,
+            trainset=trainset,
             valset=valset,
             num_batches=10,
             max_bootstrapped_demos=num_demos,
@@ -195,7 +195,7 @@ def run_optimization(provider: str, optimizer_type: str, num_demos: int = 4):
         )
     else:
         raise ValueError(f"Unknown optimizer: {optimizer_type}")
-    
+
     # Evaluate on validation set
     logger.info("Evaluating on validation set...")
     correct = 0
@@ -210,17 +210,17 @@ def run_optimization(provider: str, optimizer_type: str, num_demos: int = 4):
                 perfect += 1
         except Exception as e:
             logger.warning(f"Prediction failed: {e}")
-    
+
     accuracy = correct / len(valset) if valset else 0
     perfect_rate = perfect / len(valset) if valset else 0
     logger.info(f"Validation accuracy: {accuracy:.2%}")
     logger.info(f"Perfect format rate: {perfect_rate:.2%}")
-    
+
     # Save compiled module
     output_path = Path("src/modules/compiled_architect.json")
     compiled.save(str(output_path))
     logger.info(f"Saved compiled module to {output_path}")
-    
+
     return compiled, accuracy
 
 
@@ -246,15 +246,15 @@ def main():
         default=4,
         help="Number of demo examples"
     )
-    
+
     args = parser.parse_args()
-    
+
     compiled, accuracy = run_optimization(
         provider=args.provider,
         optimizer_type=args.optimizer,
         num_demos=args.demos,
     )
-    
+
     print(f"\n{'='*50}")
     print("Optimization complete!")
     print(f"Accuracy: {accuracy:.2%}")

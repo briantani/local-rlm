@@ -4,71 +4,35 @@
     "train": [],
     "demos": [
       {
-        "task": "Save results to the output directory",
-        "context_summary": "output_dir = '/tmp/output'",
-        "python_code": "# CORRECT: Use 'output_dir' not '__artifacts_dir__'\nresults = {'score': 0.95, 'accuracy': 0.92}\nwith open(f'{output_dir}/results.json', 'w') as f:\n    json.dump(results, f, indent=2)\nprint(f'Saved to {output_dir}/results.json')"
-      },
-      {
-        "task": "Answer the original question using collected data",
-        "context_summary": "Execution History: 6 steps, 45000 chars total.",
-        "python_code": "# Use 'history' and 'task' simple aliases\nrelevant = []\nfor entry in history:\n    if entry['output_length'] > 100:\n        relevant.append(f\"Step {entry['step']}:\\n{entry['output'][:5000]}\")\n\ncontext_str = '\\n\\n---\\n\\n'.join(relevant)\nanswer = llm_query(f'Based on this research, answer: {task}', context_str[:50000])\nprint(answer)"
-      },
-      {
-        "task": "Read a Word document and extract paragraphs",
-        "context_summary": "AVAILABLE FILES: [FILE] report.docx",
-        "python_code": "# docx is pre-loaded - NO imports\ndoc = docx.Document(f'{input_dir}/report.docx')\nparagraphs = [p.text for p in doc.paragraphs if p.text.strip()]\nprint(f'Found {len(paragraphs)} paragraphs')\nfor i, p in enumerate(paragraphs[:5]):\n    print(f'{i+1}. {p[:100]}...')"
-      },
-      {
-        "task": "Calculate compound interest",
-        "context_summary": "",
-        "python_code": "# math is pre-loaded - NO imports\nprincipal = 10000\nrate = 0.05\nyears = 10\nfinal = principal * math.pow(1 + rate, years)\nprint(f'Principal: ${principal:,}')\nprint(f'Rate: {rate*100}%')\nprint(f'Years: {years}')\nprint(f'Final amount: ${final:,.2f}')"
-      },
-      {
-        "task": "Create a bar chart of quarterly sales and save it",
-        "context_summary": "output_dir = '/tmp/output'",
-        "python_code": "# plt is pre-loaded - NO imports\ndata = {'Q1': 100, 'Q2': 150, 'Q3': 120, 'Q4': 180}\nplt.figure(figsize=(10, 6))\nplt.bar(data.keys(), data.values(), color='steelblue')\nplt.title('Quarterly Sales')\nplt.ylabel('Sales ($K)')\nplt.savefig(f'{output_dir}/sales_chart.png', dpi=100)\nplt.close()\nprint(f'Chart saved to {output_dir}/sales_chart.png')"
-      },
-      {
-        "task": "Find all email addresses in the document",
-        "context_summary": "Execution History: 1 step. Last output: document text...",
-        "python_code": "# re is pre-loaded, history is the simple alias for execution history\ntext = history[-1]['output'] if history else 'test@example.com'\nemails = re.findall(r'[\\w.+-]+@[\\w-]+\\.[\\w.-]+', text)\nprint(f'Found {len(emails)} emails:')\nfor email in emails:\n    print(f'  - {email}')"
-      },
-      {
-        "task": "Create a correlation heatmap for the data",
-        "context_summary": "output_dir = '/tmp/output'",
-        "python_code": "# sns (seaborn) is pre-loaded - NO imports\ndata = pd.DataFrame(np.random.randn(50, 4), columns=['A', 'B', 'C', 'D'])\nplt.figure(figsize=(8, 6))\nsns.heatmap(data.corr(), annot=True, cmap='coolwarm', center=0)\nplt.title('Correlation Heatmap')\nplt.tight_layout()\nplt.savefig(f'{output_dir}/heatmap.png')\nplt.close()\nprint('Heatmap saved')"
-      },
-      {
+        "augmented": true,
         "task": "Count word frequencies in text",
         "context_summary": "",
-        "python_code": "# Counter is pre-loaded - NO imports\ntext = 'the quick brown fox jumps over the lazy dog the fox is quick'\nwords = text.lower().split()\nword_counts = Counter(words)\nprint('Word frequencies:')\nfor word, count in word_counts.most_common(5):\n    print(f'  {word}: {count}')"
+        "reasoning": "To count word frequencies in a given text, we can use Python's built-in `collections.Counter` to facilitate this task. This approach is straightforward and efficient for counting occurrences of each word.",
+        "python_code": "from collections import Counter\n\ntext = \"This is an example text with some words repeated and some not.\"\nwords = text.split()\nword_frequencies = Counter(words)\nprint(word_frequencies)"
       },
       {
-        "task": "Get the last execution output",
-        "context_summary": "Execution History: 3 steps.",
-        "python_code": "# CORRECT: Use 'history' not '__execution_history__'\nlast_output = history[-1]['output'] if history else 'No history'\nprint(f'Last output ({len(last_output)} chars):')\nprint(last_output[:500])"
+        "augmented": true,
+        "task": "Calculate compound interest",
+        "context_summary": "",
+        "reasoning": "To calculate compound interest, we can use the formula: A = P(1 + r/n)^(nt), where:\n- A is the amount of money accumulated after n years, including interest.\n- P is the principal amount (the initial amount of money).\n- r is the annual interest rate (decimal).\n- n is the number of times that interest is compounded per year.\n- t is the time the money is invested for in years.",
+        "python_code": "# No imports needed\nprincipal = 1000  # Initial investment\nrate = 0.05       # Annual interest rate\nn = 4             # Compounded quarterly\ntime = 3          # Years\n\namount = principal * (1 + rate/n)**(n*time)\ninterest = amount - principal\n\nprint(f'Initial Principal: ${principal}')\nprint(f'Annual Interest Rate: {rate*100}%')\nprint(f'Compounding Frequency: {n} times per year')\nprint(f'Time Period: {time} years')\nprint(f'Amount after {time} years: ${amount:.2f}')\nprint(f'Compound Interest Earned: ${interest:.2f}')"
       },
       {
         "task": "Convert data to JSON and save it",
         "context_summary": "output_dir = '/tmp/output'",
         "python_code": "# json is pre-loaded - NO imports\ndata = {'name': 'Report', 'values': [1, 2, 3], 'meta': {'version': '1.0'}}\nwith open(f'{output_dir}/data.json', 'w') as f:\n    json.dump(data, f, indent=2)\nprint('JSON saved')\nprint(json.dumps(data, indent=2))"
-      },
-      {
-        "task": "Research three topics in parallel and combine results",
-        "context_summary": "Execution History: 0 steps.",
-        "python_code": "# Use recursive_llm for paper-style sub-agent spawning\ntopics = ['machine learning trends', 'quantum computing', 'climate tech']\nresults = []\nfor topic in topics:\n    result = recursive_llm(f'Research and summarize: {topic}', '')\n    results.append(f'{topic}: {result}')\nprint('Combined research results:')\nfor r in results:\n    print(f'\\n{r}')"
       }
     ],
     "signature": {
-      "instructions": "Generates Python code to solve a specific task.\nThe code should be a valid Python script that prints the final result to stdout.\n\nCRITICAL RULES:\n1. Do NOT use `import` statements - ALL modules are PRE-LOADED as globals.\n2. Do NOT use Jupyter syntax like `!pip install`. Only valid Python allowed.\n3. Do NOT use `subprocess`, `os.system`, or shell commands.\n4. Output ONLY executable Python code, no explanatory text.\n\nPRE-LOADED DATA SCIENCE MODULES (use directly, no import needed):\n- np / numpy - NumPy for numerical operations\n- pd / pandas - Pandas for data manipulation and analysis\n- plt / matplotlib - Matplotlib for plotting (use plt.savefig(), NOT plt.show())\n- sns / seaborn - Seaborn for statistical visualization\n- scipy / scipy_stats - SciPy for scientific computing and statistics\n- sklearn - Scikit-learn (LinearRegression, LogisticRegression, KMeans, StandardScaler, sklearn_metrics)\n- sm / statsmodels - Statsmodels for statistical analysis and regression\n\nPRE-LOADED DOCUMENT PROCESSING:\n- pdfplumber - Extract text and tables from PDFs: pdfplumber.open(path)\n- pypdf - PDF manipulation and reading\n- docx - Read/write Word documents: docx.Document(path)\n- openpyxl - Read/write Excel files (used by pandas for .xlsx)\n\nPRE-LOADED UTILITIES:\n- re - Regular expressions\n- json - JSON parsing\n- math - Math functions\n- datetime, timedelta - Date/time handling\n- Counter, defaultdict - Collection utilities\n\nPRE-LOADED FUNCTIONS:\n- search_web(query) - Search the web and get results\n- llm_query(question, context_chunk) - Ask LLM about a chunk (~500K char limit per call)\n- recursive_llm(sub_query, sub_context) - Spawn a sub-agent to solve a sub-task (paper-style recursion)\n\nAVAILABLE VARIABLES:\n- output_dir - Directory to save output files (e.g., plt.savefig(f'{output_dir}/chart.png'))\n- input_dir - Directory with input files (from --context flag)\n- history - List of previous execution steps: [{\"step\": 1, \"code\": \"...\", \"output\": \"...\", \"output_length\": 123}, ...]\n- task - The original task string\n- context - Last execution output (shortcut for history[-1]['output'])\n\nMATPLOTLIB/SEABORN USAGE:\n- Use `plt.savefig(f'{output_dir}/filename.png')` to save charts\n- Always call `plt.close()` after saving to free memory\n- Backend is 'Agg' (non-interactive, file-only)\n\nEXAMPLE - Data Analysis with Visualization:\n    # Generate data\n    data = pd.DataFrame({'x': np.random.randn(100), 'y': np.random.randn(100)})\n\n    # Create visualization with seaborn\n    plt.figure(figsize=(10, 6))\n    sns.scatterplot(data=data, x='x', y='y')\n    plt.title('Scatter Plot')\n    plt.savefig(f'{output_dir}/scatter.png')\n    plt.close()\n\n    # Statistical analysis\n    correlation = scipy_stats.pearsonr(data['x'], data['y'])\n    print(f'Correlation: {correlation[0]:.3f}, p-value: {correlation[1]:.3f}')\n\nEXAMPLE - Machine Learning:\n    # Simple linear regression\n    X = np.array([[1], [2], [3], [4]])\n    y = np.array([2, 4, 6, 8])\n    model = LinearRegression()\n    model.fit(X, y)\n    print(f'Coefficient: {model.coef_[0]:.2f}, Intercept: {model.intercept_:.2f}')",
+      "instructions": "The task is to predict Python code based on a given task description and an optional context summary. The goal is to generate executable Python code that adheres to specific rules, such as no import statements or subprocess calls, and uses pre-loaded libraries like numpy, pandas, plt, sns, etc.\n\nTo achieve this, the following steps should be followed:\n\n1. **Parse Input**: Extract the task description and context summary from the inputs.\n2. **Reasoning**: Use a step-by-step reasoning process to break down the task into smaller, manageable steps.\n3. **Generate Code**: Based on the reasoning, generate Python code that solves the given task without importing any modules (all necessary functions are pre-loaded).\n4. **Formatting**: Ensure the generated code is formatted correctly, adhering to the rules provided (e.g., no subprocess calls, use of `plt.savefig()` instead of `plt.show()`).\n\n### Example:\nFor the task \"Calculate correlation between two variables,\" the reasoning might involve:\n- Identify that scipy_stats library has a function to calculate correlation.\n- Extract necessary data from a sample input or historical data.\n- Use `scipy_stats.pearsonr` to compute the correlation coefficient.\n\nThe Python code should be:\n```python\n# scipy_stats is pre-loaded - NO imports\ndata = np.random.randn(100, 2)\ncorrelation_coefficient, p_value = scipy_stats.pearsonr(data[:, 0], data[:, 1])\nprint(f'Pearson correlation coefficient: {correlation_coefficient}')\nprint(f'P-value: {p_value}')\n```\n\n### Steps:\n1. **Input Parsing**:\n   - `task`: \"Calculate correlation between two variables\"\n   - `context_summary` (if provided): Information about the previous steps or relevant context.\n\n2. **Reasoning**:\n   - Identify necessary libraries and functions.\n   - Extract data if available or simulate with a random dataset.\n\n3. **Code Generation**:\n   - Construct Python code using the pre-loaded library functions.\n   - Ensure no import statements are used.\n\n4. **Output**:\n   - The generated Python code should be printed directly to stdout.",
       "fields": [
         {
           "prefix": "Task:",
-          "description": "The task to solve using Python code."
+          "description": "The task to solve with Python code."
         },
         {
           "prefix": "Context Summary:",
-          "description": "Metadata about execution history (step count, output sizes). Use history variable in code for full content."
+          "description": "Execution history metadata."
         },
         {
           "prefix": "Reasoning: Let's think step by step in order to",
@@ -76,7 +40,7 @@
         },
         {
           "prefix": "Python Code:",
-          "description": "ONLY executable Python code. No markdown, no import statements, no comments explaining what you're about to do, no !pip commands."
+          "description": "Executable Python code only. No markdown, no imports."
         }
       ]
     },

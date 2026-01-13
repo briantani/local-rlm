@@ -2,52 +2,9 @@
   "decide.predict": {
     "traces": [],
     "train": [],
-    "demos": [
-      {
-        "augmented": true,
-        "query": "What is the average sales in sales.csv?",
-        "data_desc": "AVAILABLE FILES:\n[FILE] sales.csv\nExecution History:\n--- Step 1 ---\nInput: import pandas as pd; df = pd.read_csv('sales.csv'); print(df['sales'].mean())\nOutput: 1523.45\n",
-        "reasoning": "The average sales in the 'sales.csv' file has been calculated.",
-        "action": "ANSWER"
-      },
-      {
-        "augmented": true,
-        "query": "Create a pie chart showing the distribution of categories",
-        "data_desc": "Previous execution:\ndf loaded with columns: ['category', 'value']\n",
-        "reasoning": "To create a pie chart showing the distribution of categories, we need to use matplotlib in Python. The user has already loaded a DataFrame `df` with columns 'category' and 'value'. We will proceed to calculate the value counts for each category and then plot these as a pie chart.",
-        "action": "CODE"
-      },
-      {
-        "augmented": true,
-        "query": "What is machine learning?",
-        "data_desc": "Execution History:\n",
-        "reasoning": "The query \"What is machine learning?\" can be answered with a general definition or explanation.",
-        "action": "ANSWER"
-      },
-      {
-        "augmented": true,
-        "query": "What is recursion in programming?",
-        "data_desc": "Execution History:\n",
-        "reasoning": "Recursion in programming is a method where the solution to a problem depends on solutions to smaller instances of the same problem. It involves defining a function that calls itself in its definition.",
-        "action": "ANSWER"
-      },
-      {
-        "augmented": true,
-        "query": "Load data.csv, calculate the mean, and plot a histogram",
-        "data_desc": "AVAILABLE FILES:\n[FILE] data.csv\nExecution History:\n--- Step 1 ---\nInput: import pandas as pd; df = pd.read_csv('data.csv'); print(df['value'].mean())\nOutput: 15.0\n--- Step 2 ---\nInput: import matplotlib.pyplot as plt; df['value'].hist(); plt.savefig('histogram.png'); print('Saved histogram.png')\nOutput: Saved histogram.png\n",
-        "reasoning": "The user has already provided code to load data.csv, calculate the mean of a column named 'value', and plot a histogram. The results are in the execution history.",
-        "action": "ANSWER"
-      },
-      {
-        "augmented": true,
-        "query": "Read the Excel file report.xlsx",
-        "data_desc": "AVAILABLE FILES:\n[FILE] report.xlsx\nExecution History:\n--- Step 1 ---\nInput: import pandas as pd; df = pd.read_excel('report.xlsx')\nOutput: Traceback: ModuleNotFoundError: No module named 'openpyxl'\n",
-        "reasoning": "The error message indicates that the `openpyxl` module is missing, which is required to read Excel files in Python. This requires code to be generated to handle this specific task.",
-        "action": "CODE"
-      }
-    ],
+    "demos": [],
     "signature": {
-      "instructions": "decides the best action to take for a given query.\n1. 'CODE': For math, data processing, logic puzzles, file operations, or whenever the user asks for code/Python. CRITICAL: If the user asks about the *content* of a file listed in 'data_desc', you MUST choose 'CODE' to read it. For complex multi-part tasks, use 'CODE' to call recursive_llm() for sub-tasks.\n2. 'ANSWER': For general knowledge, chit-chat, or IF the answer is EXPLICITLY visible in 'data_desc' (e.g. under \"Output:\"). Do NOT generate code if the output is already there.",
+      "instructions": "Determine whether to provide an answer (`ANSWER`) or generate code (`CODE`) based on the user's query. For tasks that require coding, such as data processing, math calculations, or reading files, select `CODE`. For general knowledge questions or if the answer is explicitly visible in the data description, choose `ANSWER`.",
       "fields": [
         {
           "prefix": "Query:",
