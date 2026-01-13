@@ -2,11 +2,11 @@
 Optimize Architect for clean action extraction.
 
 This optimizer focuses specifically on teaching the model to:
-1. Output ONLY the action word (ANSWER, CODE, or DELEGATE)
+1. Output ONLY the action word (ANSWER or CODE)
 2. Never output explanations, numbered lists, or verbose reasoning
 3. Make the right decision in one word
 
-Uses a strict metric that penalizes any output that isn't exactly one of the three actions.
+Uses a strict metric that penalizes any output that isn't exactly one of the two actions.
 """
 
 import argparse
@@ -56,7 +56,7 @@ def strict_action_metric(example, prediction, trace=None) -> float:
     
     This teaches the model to be concise.
     """
-    valid_actions = {"ANSWER", "CODE", "DELEGATE"}
+    valid_actions = {"ANSWER", "CODE"}
     expected = example.action.upper().strip()
     
     # Handle both Prediction object and dict
@@ -98,7 +98,7 @@ def format_strictness_metric(example, prediction, trace=None) -> float:
     - 0.3: Correct action buried in explanation
     - 0.0: Wrong or missing action
     """
-    valid_actions = {"ANSWER", "CODE", "DELEGATE"}
+    valid_actions = {"ANSWER", "CODE"}
     expected = example.action.upper().strip()
     
     if isinstance(prediction, dict):

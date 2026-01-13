@@ -44,7 +44,8 @@ def get_architect_data() -> list[dspy.Example]:
     """
     Returns training examples for the Architect module.
 
-    The Architect decides: ANSWER, CODE, or DELEGATE.
+    The Architect decides: ANSWER or CODE.
+    (DELEGATE was removed - sub-agents are now spawned via recursive_llm() in code)
     Examples are organized as contrastive pairs to teach decision boundaries.
 
     IMPORTANT: data_desc uses paper-style METADATA format, not full content.
@@ -106,19 +107,20 @@ def get_architect_data() -> list[dspy.Example]:
         ).with_inputs("query", "data_desc"),
 
         # =====================================================================
-        # PAIR 4: Delegation - DELEGATE vs ANSWER
+        # PAIR 4: Sub-task Recursion - CODE with recursive_llm()
+        # Paper-style: Complex tasks use recursive_llm() to spawn sub-agents
         # =====================================================================
-        # Explicit parallel request
+        # Need to break down into sub-tasks
         dspy.Example(
             query="Process these 5 items in parallel.",
             data_desc="Execution History: 0 steps. No code executed yet.",
-            action="DELEGATE"
+            action="CODE"  # Use recursive_llm() to spawn sub-agents
         ).with_inputs("query", "data_desc"),
 
-        # Delegation complete
+        # Sub-agents complete
         dspy.Example(
             query="Process these 5 items in parallel.",
-            data_desc="Execution History: 1 step, 5000 chars total.\nLast output (500 chars, truncated): Results from sub-agents:\nItem 1: Done\nItem 2: Done...",
+            data_desc="Execution History: 1 step, 5000 chars total.\nLast output (500 chars, truncated): Results from recursive_llm calls:\nItem 1: Done\nItem 2: Done...",
             action="ANSWER"
         ).with_inputs("query", "data_desc"),
 
@@ -298,18 +300,18 @@ def get_architect_data() -> list[dspy.Example]:
             action="ANSWER"  # NOT "First, I will analyze each paper..."
         ).with_inputs("query", "data_desc"),
 
-        # Multi-part question that tempts verbose response
+        # Multi-part question - use CODE with recursive_llm() for sub-queries
         dspy.Example(
             query="Explain 1) Language model trends, 2) Computer vision advances",
             data_desc="Execution History: 0 steps. No code executed yet.",
-            action="DELEGATE"  # Should delegate, not list steps
+            action="CODE"  # Use recursive_llm() for each sub-topic
         ).with_inputs("query", "data_desc"),
 
-        # After delegation complete
+        # After recursive_llm() calls complete
         dspy.Example(
             query="Explain 1) Language model trends, 2) Computer vision advances",
-            data_desc="Execution History: 1 step, 8000 chars total.\nLast output (500 chars, truncated): Delegated to 2 sub-agents.\nResults:\n- LLM: Scaling laws continue...",
-            action="ANSWER"  # Combine results, don't re-delegate
+            data_desc="Execution History: 1 step, 8000 chars total.\nLast output (500 chars, truncated): recursive_llm results:\n- LLM: Scaling laws continue...",
+            action="ANSWER"  # Combine results
         ).with_inputs("query", "data_desc"),
 
         # =====================================================================
@@ -329,11 +331,11 @@ def get_architect_data() -> list[dspy.Example]:
             action="ANSWER"  # NOT "I will explain machine learning..."
         ).with_inputs("query", "data_desc"),
 
-        # Should be DELEGATE not "I will split"
+        # Should be CODE with recursive_llm() for parallelism
         dspy.Example(
             query="Process items A, B, C, D, E in parallel and summarize each",
             data_desc="Execution History: 0 steps. No code executed yet.",
-            action="DELEGATE"  # NOT "I will split this into subtasks..."
+            action="CODE"  # Use recursive_llm() in a loop or ThreadPoolExecutor
         ).with_inputs("query", "data_desc"),
 
         # =====================================================================

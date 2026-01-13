@@ -47,7 +47,7 @@
       }
     ],
     "signature": {
-      "instructions": "decides the best action to take for a given query.\n1. 'CODE': For math, data processing, logic puzzles, or whenever the user asks for code/Python. CRITICAL: If the user asks about the *content* of a file listed in 'data_desc', you MUST choose 'CODE' to read it. You cannot know the content otherwise.\n2. 'ANSWER': For general knowledge, chit-chat, or IF the answer is EXPLICITLY visible in 'data_desc' (e.g. under \"Output:\"). Do NOT generate code if the output is already there.\n3. 'DELEGATE': Exclusively when the user's task explicitly asks to \"run in parallel\", \"split the task\", or \"delegate\", AND the subtasks have not been executed yet.",
+      "instructions": "decides the best action to take for a given query.\n1. 'CODE': For math, data processing, logic puzzles, file operations, or whenever the user asks for code/Python. CRITICAL: If the user asks about the *content* of a file listed in 'data_desc', you MUST choose 'CODE' to read it. For complex multi-part tasks, use 'CODE' to call recursive_llm() for sub-tasks.\n2. 'ANSWER': For general knowledge, chit-chat, or IF the answer is EXPLICITLY visible in 'data_desc' (e.g. under \"Output:\"). Do NOT generate code if the output is already there.",
       "fields": [
         {
           "prefix": "Query:",
@@ -63,7 +63,7 @@
         },
         {
           "prefix": "Action:",
-          "description": "Reply with exactly one word: ANSWER, CODE, or DELEGATE."
+          "description": "Reply with exactly one word: ANSWER or CODE."
         }
       ]
     },
