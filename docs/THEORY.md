@@ -18,7 +18,7 @@ approaches, an RLM can:
 
 1. **Offload computation** to a Python REPL (Read-Eval-Print Loop)
 2. **Manage its own context window** more effectively
-3. **Delegate sub-tasks** to parallel sub-agents
+3. **Spawn sub-agents** via `recursive_llm()` in generated code
 4. **Learn from execution feedback** to refine its approach
 
 ## Core Architecture
@@ -31,26 +31,26 @@ approaches, an RLM can:
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      ARCHITECT                              │
-│  Decides: CODE | ANSWER | DELEGATE                          │
+│  Decides: CODE | ANSWER                                     │
 │  Uses compiled DSPy module with few-shot examples           │
 └─────────────────────────────────────────────────────────────┘
-         │              │              │
-         ▼              ▼              ▼
-    ┌─────────┐   ┌──────────┐   ┌───────────┐
-    │  CODER  │   │RESPONDER │   │ DELEGATOR │
-    │Generate │   │ Answer   │   │ Split     │
-    │ Python  │   │ directly │   │ into      │
-    │  code   │   │          │   │ subtasks  │
-    └────┬────┘   └──────────┘   └─────┬─────┘
-         │                             │
-         ▼                             ▼
-    ┌─────────┐                 ┌───────────┐
-    │  REPL   │                 │  Parallel │
-    │ Execute │                 │  Sub-     │
-    │  code   │                 │  Agents   │
-    └────┬────┘                 └───────────┘
+         │                         │
+         ▼                         ▼
+    ┌─────────┐              ┌──────────┐
+    │  CODER  │              │RESPONDER │
+    │Generate │              │ Answer   │
+    │ Python  │              │ directly │
+    │  code   │              │          │
+    └────┬────┘              └──────────┘
          │
          ▼
+    ┌─────────────────────┐
+    │        REPL         │
+    │   Execute code      │
+    │  recursive_llm()    │◄─── spawns sub-agents
+    └─────────┬───────────┘
+              │
+              ▼
     ┌─────────┐
     │ Output  │
     │ + State │
@@ -71,13 +71,12 @@ The Architect module receives:
 - Current execution history (code run, outputs received)
 - Available context (files, previous results)
 
-It outputs one of three actions:
+It outputs one of two actions:
 
 | Action | When Used | Next Step |
-|--------|-----------|-----------|
-| **CODE** | Need computation, data processing, or file operations | Generate and execute Python |
+|--------|-----------|-----------||
+| **CODE** | Need computation, data processing, file ops, or complex sub-tasks | Generate and execute Python (can call `recursive_llm()`) |
 | **ANSWER** | Have enough information to respond | Generate final answer |
-| **DELEGATE** | Task too complex, needs parallel breakdown | Split into subtasks |
 
 ### Step 2: Execute Action
 
@@ -86,20 +85,14 @@ It outputs one of three actions:
 1. **Coder** generates Python code
 2. **REPL** executes in stateful sandbox
 3. Output (stdout/errors) captured
-4. Loop back to Architect with new context
+4. Code can call `recursive_llm(sub_query, context)` to spawn sub-agents
+5. Loop back to Architect with new context
 
 **If ANSWER:**
 
 1. **Responder** formats final answer
 2. Include any generated artifacts (images, reports)
 3. Return to user
-
-**If DELEGATE:**
-
-1. **Delegator** breaks task into subtasks
-2. Spawn parallel sub-agents (ThreadPoolExecutor)
-3. Each sub-agent runs its own RLM loop
-4. Aggregate results and continue
 
 ## Key Innovations
 
@@ -117,21 +110,21 @@ result = df.groupby('category').sum()
 
 Variables persist across executions, enabling iterative problem-solving.
 
-### 2. Recursive Delegation
+### 2. Emergent Recursion via recursive_llm()
 
-For complex tasks, the agent spawns sub-agents:
+For complex tasks, generated code can spawn sub-agents using `recursive_llm()`:
 
-```text
-Task: "Analyze 1000 documents"
-├── Sub-agent 1: "Analyze documents 1-250"
-├── Sub-agent 2: "Analyze documents 251-500"
-├── Sub-agent 3: "Analyze documents 501-750"
-└── Sub-agent 4: "Analyze documents 751-1000"
-    └── Aggregate results
+```python
+# Generated code can call recursive_llm() for sub-tasks
+results = []
+for doc in documents[:4]:
+    result = recursive_llm(f"Analyze this document: {doc}", context)
+    results.append(result)
+print("\n".join(results))
 ```
 
 Each sub-agent has its own REPL and context, with depth limits to prevent
-infinite recursion.
+infinite recursion. Sub-agents use the `delegate` config section for model selection.
 
 ### 3. DSPy Optimization
 
@@ -151,7 +144,7 @@ The original research achieved impressive results:
 | OOLONG-Pairs | 58.00% F1 | 0.04% |
 | CodeQA | 62.00% | 24% |
 
-These results used GPT-5 for root agent and GPT-5-mini for delegates.
+These results used GPT-5 for root agent and GPT-5-mini for sub-agents.
 
 ## Implementation Details
 

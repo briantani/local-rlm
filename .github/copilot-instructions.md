@@ -9,11 +9,12 @@ It uses **Python 3.14.2 (Free-Threaded)** and **DSPy** to build an agent that re
 
 The agent operates in a **recursive decision loop**:
 
-1. **Architect** (`src/modules/architect.py`) decides: ANSWER, CODE, or DELEGATE
+1. **Architect** (`src/modules/architect.py`) decides: ANSWER or CODE
 2. **Coder** (`src/modules/coder.py`) generates Python when CODE is chosen
 3. **REPL** (`src/core/repl.py`) executes code in a RestrictedPython sandbox
 4. **Responder** (`src/modules/responder.py`) formats final answers
-5. **Delegator** (`src/modules/delegator.py`) spawns parallel sub-agents for DELEGATE
+
+**Emergent Recursion**: Generated code can call `recursive_llm(sub_query, context)` to spawn sub-agents, enabling paper-style recursive problem decomposition without a dedicated Delegator module.
 
 ### Service Layer (Phase 12)
 
@@ -29,7 +30,7 @@ The project uses a **service layer pattern** to share business logic between CLI
 
 - **`src/core/repl.py`**: RestrictedPython sandbox for code execution. Pre-loads data science libraries (numpy, pandas, matplotlib, seaborn, scipy, sklearn, statsmodels) and document processing (pdfplumber, docx, openpyxl). Uses `_write_`, `_inplacevar_` guards for secure assignment operations.
 - **`src/core/budget.py`**: Thread-safe singleton tracking token usage per model. **CRITICAL**: Uses `threading.Lock` - Python 3.14t has true parallelism (no GIL).
-- **`src/core/config_loader.py`**: YAML-based multi-model configuration. Root agent can use GPT-5, delegates use GPT-5-mini, Coder uses Ollama, etc.
+- **`src/core/config_loader.py`**: YAML-based multi-model configuration. Root agent can use GPT-5, sub-agents (via `recursive_llm()`) use GPT-5-mini, Coder uses Ollama, etc.
 - **`src/core/agent.py`**: Main orchestrator. Implements recursive delegation with depth limits. Uses Protocol-based dependency injection for testing.
 - **`src/config.py`**: Model factory using `match/case`. Returns DSPy LM objects (`dspy.Google`, `dspy.OllamaLocal`, `dspy.OpenAI`).
 
@@ -40,7 +41,7 @@ src/
   rlm/        # Core library package (Phase 12+)
     services/ # Service layer: TaskService, ConfigService, SessionService
   core/       # Infrastructure (REPL, Budget, Config, Agent orchestration)
-  modules/    # DSPy Signatures and Modules (Architect, Coder, Responder, Delegator)
+  modules/    # DSPy Signatures and Modules (Architect, Coder, Responder)
   optimization/  # DSPy compilation/optimization scripts (MIPROv2)
   tools/      # External capabilities (web search via DuckDuckGo)
   utils/      # Shared helpers
@@ -90,12 +91,12 @@ uv run python src/main.py --prompt-file tasks/research.txt --config configs/high
 
 Profiles live in `configs/`. Key profiles:
 
-- **`paper-gpt5.yaml`**: Replicates paper setup (GPT-5 root, GPT-5-mini delegates)
+- **`paper-gpt5.yaml`**: Replicates paper setup (GPT-5 root, GPT-5-mini for sub-agents)
 - **`local-only.yaml`**: Free Ollama models only (no API costs)
 - **`hybrid.yaml`**: Best of both (Ollama for Coder, Gemini for Architect)
 - **`cost-effective.yaml`**: Gemini 2.5 Flash everywhere
 
-To add a new profile, copy an existing YAML and modify `root`, `delegate`, and `modules` sections.
+To add a new profile, copy an existing YAML and modify `root`, `delegate` (sub-agent settings), and `modules` sections.
 
 ### Dependency Management
 
@@ -295,7 +296,7 @@ Training data lives in `src/optimization/data.py`. Key principles:
 
 ### DSPy Configuration Context
 
-- The agent uses **context-aware LM switching**: Root agent, delegate agents, and individual modules can use different models.
+- The agent uses **context-aware LM switching**: Root agent, sub-agents (via `recursive_llm()`), and individual modules can use different models.
 - `src/config.py`'s `get_lm_for_role()` handles this. It temporarily switches `dspy.settings.configure(lm=...)` for each role.
 - **Never call `dspy.settings.configure()` in module code** - it's managed globally by `main.py` and `agent.py`.
 

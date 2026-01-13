@@ -270,14 +270,13 @@ model: gpt-4o            # or gpt-4o-mini
 
 ## Module Roles
 
-The RLM agent has four specialized modules:
+The RLM agent has three specialized modules:
 
 | Module | Role | Recommended Model |
 |--------|------|-------------------|
-| **Architect** | Decides next action (CODE/ANSWER/DELEGATE) | Best reasoning model |
-| **Coder** | Generates Python code | Code-specialized model |
+| **Architect** | Decides next action (CODE/ANSWER) | Best reasoning model |
+| **Coder** | Generates Python code (can use `recursive_llm()` for sub-tasks) | Code-specialized model |
 | **Responder** | Formats final answers | Fast model |
-| **Delegator** | Manages sub-agents | Same as root |
 
 ### Per-Module Override Example
 

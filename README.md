@@ -8,12 +8,12 @@ A Python implementation of the **Recursive Language Model (RLM)** agent architec
 
 RLM is an agent architecture that recursively solves problems by:
 
-1. **Architect** decides: generate CODE, give ANSWER, or DELEGATE to sub-agent
+1. **Architect** decides: generate CODE or give ANSWER
 2. **Coder** writes Python code when needed
-3. **REPL** executes code in a persistent sandbox
+3. **REPL** executes code in a persistent sandbox (with `recursive_llm()` for sub-tasks)
 4. **Responder** formats the final answer
 
-Unlike traditional Chain-of-Thought, RLM offloads computation to a real Python interpreter and manages complex, multi-step reasoning through recursion.
+Unlike traditional Chain-of-Thought, RLM offloads computation to a real Python interpreter. Complex tasks are handled through emergent recursion - generated code can call `recursive_llm()` to spawn sub-agents.
 
 ## Quick Start
 
@@ -105,20 +105,21 @@ uv run python src/main.py --prompt-file tasks/research.txt --config configs/high
                           ▼
 ┌─────────────────────────────────────────────────────────┐
 │                    ARCHITECT                            │
-│           Decides: CODE | ANSWER | DELEGATE             │
-└───────────┬─────────────┬─────────────┬─────────────────┘
-            │             │             │
-    ┌───────▼───────┐     │     ┌───────▼───────┐
-    │     CODER     │     │     │   DELEGATOR   │
-    │  Generate Py  │     │     │  Spawn Agent  │
-    └───────┬───────┘     │     └───────────────┘
-            ▼             │
-    ┌───────────────┐     │
-    │     REPL      │     │
-    │  Execute Py   │     │
-    └───────┬───────┘     │
-            │             │
-            ▼             ▼
+│               Decides: CODE | ANSWER                    │
+└───────────┬─────────────────────────┬───────────────────┘
+            │                         │
+    ┌───────▼───────┐                 │
+    │     CODER     │                 │
+    │  Generate Py  │                 │
+    └───────┬───────┘                 │
+            ▼                         │
+    ┌───────────────┐                 │
+    │     REPL      │                 │
+    │  Execute Py   │                 │
+    │ recursive_llm │◄──── spawns sub-agents
+    └───────┬───────┘                 │
+            │                         │
+            ▼                         ▼
 ┌─────────────────────────────────────────────────────────┐
 │                    RESPONDER                            │
 │              Format Final Answer                        │
