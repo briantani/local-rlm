@@ -132,21 +132,29 @@ class PythonREPL:
     Pre-loaded functions:
     - search_web(query): Search the web using DuckDuckGo
     - llm_query(query, context_chunk): Make recursive sub-LM call on a chunk
+    - recursive_llm(sub_query, sub_context): Spawn sub-agent (paper-style recursion)
     - FINAL(answer): Paper-style termination (detected by agent)
 
-    The llm_query function enables paper-style context handling:
-        result = llm_query("Summarize this section", context[0:10000])
-        results = [llm_query(f"Classify: {item}", item) for item in items]
+    The recursive_llm function enables paper-style emergent recursion:
+        result = recursive_llm("Analyze this section", context[0:10000])
+        results = [recursive_llm(f"Process: {item}", item) for item in items]
     """
     def __init__(
         self,
         run_context: "RunContext | None" = None,
         context_dir: str | None = None,
         budget_manager: "BudgetManager | None" = None,
+        # Agent factory for recursive_llm (paper-style recursion)
+        agent_config: "Any" = None,
+        current_depth: int = 0,
+        max_depth: int = 5,
     ):
         self.run_context = run_context
         self.context_dir = context_dir
         self.budget_manager = budget_manager
+        self.agent_config = agent_config
+        self.current_depth = current_depth
+        self.max_depth = max_depth
 
         # Execution history exposed to code (paper-inspired)
         self._execution_history: list[dict] = []
@@ -367,6 +375,10 @@ class PythonREPL:
         self._llm_query_fn = create_llm_query(budget_manager=self.budget_manager)
         self.globals["llm_query"] = self._llm_query_fn
 
+        # Create recursive_llm for spawning sub-agents (paper-style)
+        self._recursive_llm_fn = self._create_recursive_llm()
+        self.globals["recursive_llm"] = self._recursive_llm_fn
+
         # Expose execution history as a list the code can access
         self.globals["__execution_history__"] = self._execution_history
 
@@ -428,6 +440,63 @@ class PythonREPL:
         # Allow writes to common data types used in data science
         # Could add restrictions here if needed for security
         return obj
+
+    def _create_recursive_llm(self):
+        """Create a recursive_llm function for paper-style sub-agent spawning.
+
+        This function allows code to spawn a sub-agent to handle a sub-task:
+            result = recursive_llm("Analyze this section", context[0:10000])
+
+        The sub-agent runs at depth+1 and shares budget tracking.
+
+        Returns:
+            A callable that spawns a sub-agent and returns the result string.
+        """
+        def recursive_llm(sub_query: str, sub_context: str = "") -> str:
+            """Spawn a sub-agent to handle a sub-task (paper-style recursion).
+
+            Args:
+                sub_query: The sub-task to solve.
+                sub_context: Optional context string for the sub-agent.
+
+            Returns:
+                The sub-agent's final answer as a string.
+            """
+            # Check depth limit
+            if self.current_depth >= self.max_depth:
+                return f"[ERROR: Max recursion depth ({self.max_depth}) reached. Cannot spawn sub-agent.]"
+
+            # Only import here to avoid circular imports
+            from src.core.agent import RLMAgent
+
+            try:
+                # Create sub-agent at depth+1
+                sub_agent = RLMAgent(
+                    depth=self.current_depth + 1,
+                    config=self.agent_config,
+                    is_delegate=True,
+                    budget_manager=self.budget_manager,
+                    run_context=self.run_context,
+                    root_dir=self.context_dir,
+                )
+
+                # If sub_context provided, add it to the task
+                if sub_context:
+                    # Truncate context if too long for prompt
+                    if len(sub_context) > 50000:
+                        sub_context = sub_context[:50000] + "\n...[truncated]..."
+                    full_query = f"{sub_query}\n\nContext:\n{sub_context}"
+                else:
+                    full_query = sub_query
+
+                # Run the sub-agent
+                result = sub_agent.run(full_query)
+                return result
+
+            except Exception as e:
+                return f"[ERROR in recursive_llm: {e}]"
+
+        return recursive_llm
 
     def set_task(self, task: str) -> None:
         """Set the current task so code can access it via __task__ or task."""

@@ -15,7 +15,10 @@ class CoderSignature(dspy.Signature):
 
     VARIABLES: output_dir, input_dir, history, task, context
 
-    FUNCTIONS: search_web(query), llm_query(question, text)
+    FUNCTIONS:
+    - search_web(query) - Search the web
+    - llm_query(question, text) - Ask LLM about text chunk
+    - recursive_llm(sub_query, sub_context) - Spawn sub-agent for complex sub-tasks
 
     Variables from previous steps persist - reuse them directly.
     """

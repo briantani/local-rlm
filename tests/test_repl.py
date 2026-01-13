@@ -127,6 +127,20 @@ class TestPaperStyleMetadata:
         output = repl.execute("print(callable(llm_query))")
         assert "True" in output
 
+    def test_recursive_llm_available_in_globals(self):
+        """Test that recursive_llm function is available for paper-style recursion."""
+        repl = PythonREPL()
+        # Just check it exists, don't call it in tests (would spawn agents)
+        output = repl.execute("print(callable(recursive_llm))")
+        assert "True" in output
+
+    def test_recursive_llm_depth_limit(self):
+        """Test that recursive_llm respects max depth."""
+        repl = PythonREPL(max_depth=2, current_depth=2)  # Already at max
+        # Call the function directly (it should return an error message)
+        result = repl.globals["recursive_llm"]("sub query", "sub context")
+        assert "Max recursion depth" in result
+
     def test_history_entry_preserves_large_output(self):
         """Test that full output is preserved in history (not truncated)."""
         repl = PythonREPL()

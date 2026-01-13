@@ -87,10 +87,14 @@ class RLMAgent:
         # Pass run_context so files are saved to artifacts folder
         # Pass root_dir as context_dir so code can access input files
         # Pass budget_manager for llm_query cost tracking
+        # Pass config and depth for recursive_llm sub-agent spawning
         self.repl = repl if repl else PythonREPL(
             run_context=run_context,
             context_dir=str(self.root_dir.absolute()) if self.root_dir else None,
             budget_manager=budget_manager,
+            agent_config=config,
+            current_depth=depth,
+            max_depth=self.max_depth,
         )
         self.architect = architect if architect else Architect()
         self.coder = coder if coder else Coder()
