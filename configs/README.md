@@ -9,7 +9,7 @@ This directory contains YAML configuration files for different RLM agent profile
 **Based on:** Exact RLM paper setup (arXiv:2512.24601v1)
 **Use Case:** Reproduce research results, maximum quality, academic benchmarking
 **Cost:** ~$5/task (paper averaged $0.99 for BrowseComp+)
-**Strategy:** GPT-5 for root, GPT-5-mini for delegates (now publicly available!)
+**Strategy:** GPT-5 for root, GPT-5-mini for sub-agents (via `recursive_llm()`)
 
 **Paper Results:**
 
@@ -26,7 +26,7 @@ uv run python src/main.py "Complex research task" --config configs/paper-gpt5.ya
 **Based on:** GPT-5.2 (OpenAI's best coding/agentic model)
 **Use Case:** Complex research, deep analysis, maximum accuracy
 **Cost:** ~$5/task
-**Strategy:** GPT-5.2 for root reasoning, GPT-5-mini for recursive sub-calls
+**Strategy:** GPT-5.2 for root reasoning, GPT-5-mini for sub-agents (via `recursive_llm()`)
 
 ```bash
 uv run python src/main.py "Analyze quantum computing trends" --config configs/high-quality.yaml
@@ -36,7 +36,7 @@ uv run python src/main.py "Analyze quantum computing trends" --config configs/hi
 
 **Use Case:** Development, testing, production tasks with cost control
 **Cost:** ~$0.50/task
-**Strategy:** Gemini 2.5 Flash (best price-performance) with Flash-Lite for delegates
+**Strategy:** Gemini 2.5 Flash (best price-performance), Flash-Lite for sub-agents
 
 ```bash
 uv run python src/main.py "Calculate Fibonacci 100" --config configs/cost-effective.yaml
@@ -46,7 +46,7 @@ uv run python src/main.py "Calculate Fibonacci 100" --config configs/cost-effect
 
 **Use Case:** Sensitive data, offline work, no API costs
 **Cost:** $0 (local hardware only)
-**Strategy:** Ollama qwen2.5-coder, larger model for root, smaller for delegates
+**Strategy:** Ollama qwen2.5-coder:14b for root, smaller 7b for sub-agents
 
 ```bash
 uv run python src/main.py "Review this confidential document" --config configs/local-only.yaml
@@ -81,7 +81,9 @@ root:
   max_steps: 10      # Max iterations before giving up
   max_depth: 3       # Max recursion depth for delegation
 
-# Delegate agents (sub-tasks)
+# Sub-agent settings (spawned by recursive_llm() during code execution)
+# When code calls recursive_llm(sub_query, context), a new agent is created
+# using these settings. Use cheaper/faster models for sub-agents.
 delegate:
   provider: gemini | openai | ollama
   model: model-name  # Often cheaper/smaller than root

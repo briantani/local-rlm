@@ -17,7 +17,7 @@ root:
     input_per_1m: 0.0   # Local = free
     output_per_1m: 0.0
 
-# Delegate agent configuration
+# Sub-agent configuration (spawned by recursive_llm() in generated code)
 delegate:
   provider: ollama
   model: qwen2.5-coder:14b

@@ -17,10 +17,11 @@ root:
     input_per_1m: 0.30   # Gemini 2.5 Flash
     output_per_1m: 2.50
 
-# Default delegate settings
+# Sub-agent settings (used when code calls recursive_llm())
+# Sub-agents are spawned during code execution to handle sub-tasks
 delegate:
   provider: gemini
-  model: gemini-2.5-flash-lite  # Ultra cost-effective
+  model: gemini-2.5-flash-lite  # Ultra cost-effective for sub-tasks
   max_steps: 5
   max_depth: 1
   pricing:

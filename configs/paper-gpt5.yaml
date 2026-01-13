@@ -31,7 +31,8 @@ root:
     input_per_1m: 1.25    # $1.25 per 1M input tokens (Standard tier)
     output_per_1m: 10.00  # $10.00 per 1M output tokens
 
-# Delegate agents: GPT-5-mini (exactly as paper used)
+# Sub-agent configuration: GPT-5-mini (exactly as paper used)
+# Spawned when generated code calls recursive_llm(sub_query, context)
 # Key insight from paper: "Use cheaper model for recursive calls"
 delegate:
   provider: openai

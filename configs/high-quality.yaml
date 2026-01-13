@@ -18,10 +18,10 @@ root:
     input_per_1m: 1.75    # $1.75 per 1M input tokens (Standard tier)
     output_per_1m: 14.00  # $14.00 per 1M output tokens
 
-# Delegate agent configuration (recursive sub-agents)
+# Sub-agent configuration (spawned by recursive_llm() in generated code)
 delegate:
   provider: openai
-  model: gpt-5-mini  # Fast, cost-efficient version
+  model: gpt-5-mini  # Fast, cost-efficient for sub-tasks
   max_steps: 8
   max_depth: 2  # Prevent infinite recursion chains
   pricing:
@@ -30,7 +30,7 @@ delegate:
 
 # Per-module model overrides (optional fine-tuning)
 modules:
-  # Architect makes the CODE/ANSWER/DELEGATE decision - needs good reasoning
+  # Architect makes the CODE/ANSWER decision - needs good reasoning
   architect:
     provider: openai
     model: gpt-5.2  # Use flagship model for critical decisions

@@ -2,7 +2,11 @@
 Configuration Loader for YAML-based profiles.
 
 Implements Phase 11: YAML Configuration Profiles for multi-model setups.
-Allows different models for root vs. delegate agents, and per-module overrides.
+Allows different models for root vs. sub-agents (spawned by recursive_llm()),
+and per-module overrides.
+
+The 'delegate' config section defines settings for sub-agents that are
+created when generated code calls recursive_llm(sub_query, context).
 """
 
 import logging
@@ -46,7 +50,7 @@ class ModelConfig:
 
 @dataclass
 class AgentConfig:
-    """Configuration for an agent (root or delegate)."""
+    """Configuration for an agent (root or sub-agent via recursive_llm)."""
     provider: str
     model: str
     max_steps: int = 10

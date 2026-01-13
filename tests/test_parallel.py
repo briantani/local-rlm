@@ -6,7 +6,7 @@
 
 class TestParallelUnitTests:
     """Unit tests for parallel execution using mocks.
-    
+
     Note: DELEGATE action has been removed from the architecture.
     These tests remain for any future parallel execution features.
     """
@@ -22,5 +22,5 @@ class TestParallelUnitTests:
 # INTEGRATION TESTS (LLM-dependent - Deprecated)
 # ============================================================================
 # Note: The DELEGATE action and parallel delegation have been removed.
-# Integration tests for parallel execution via recursive_llm() will be 
+# Integration tests for parallel execution via recursive_llm() will be
 # added in Story 5 when that feature is implemented.

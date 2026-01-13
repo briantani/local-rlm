@@ -18,7 +18,7 @@ root:
     input_per_1m: 0.50   # Gemini 3 Flash
     output_per_1m: 3.00
 
-# Delegate agent configuration
+# Sub-agent configuration (spawned by recursive_llm() in generated code)
 delegate:
   provider: gemini
   model: gemini-2.5-flash  # Cheaper stable model for sub-tasks
