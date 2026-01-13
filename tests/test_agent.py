@@ -76,34 +76,6 @@ class TestAgentUnitTests:
         assert "Max steps reached" in result
         assert mock_architect.call_count == 2
 
-    def test_agent_delegate_max_depth(self):
-        """Test that DELEGATE at max_depth adds failure to history."""
-        mock_responder = MockResponder(response="Fallback answer")
-
-        # Architect returns DELEGATE first, then ANSWER
-        call_count = [0]
-        def dynamic_architect(**kwargs):
-            call_count[0] += 1
-            if call_count[0] == 1:
-                return type('Pred', (), {'action': 'DELEGATE'})()
-            return type('Pred', (), {'action': 'ANSWER'})()
-
-        mock_architect_dynamic = type('Mock', (), {'__call__': lambda self, **kw: dynamic_architect(**kw)})()
-
-        agent = RLMAgent(
-            max_steps=3,
-            max_depth=1,
-            depth=1,  # Already at max depth
-            architect=mock_architect_dynamic,
-            responder=mock_responder,
-        )
-
-        result = agent.run("Delegate this task")
-
-        # Should have added failure message to history
-        history_text = str(agent.history)
-        assert "Max recursion saturation reached" in history_text or result == "Fallback answer"
-
     def test_agent_unknown_action(self):
         """Test that unknown action returns error message."""
         mock_architect = MockArchitect(action="UNKNOWN_ACTION")

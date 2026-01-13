@@ -21,13 +21,10 @@ class TestExtractAction:
     @pytest.mark.parametrize("raw_action,expected", [
         ("ANSWER", "ANSWER"),
         ("CODE", "CODE"),
-        ("DELEGATE", "DELEGATE"),
         ("answer", "ANSWER"),
         ("code", "CODE"),
-        ("delegate", "DELEGATE"),
         ("Answer", "ANSWER"),
         ("Code", "CODE"),
-        ("Delegate", "DELEGATE"),
     ])
     def test_clean_action_words(self, architect: Architect, raw_action: str, expected: str):
         """Test that clean action words are returned correctly."""
@@ -38,7 +35,6 @@ class TestExtractAction:
     @pytest.mark.parametrize("raw_action,expected", [
         ("  ANSWER  ", "ANSWER"),
         ("\nCODE\n", "CODE"),
-        ("\tDELEGATE\t", "DELEGATE"),
         ("  answer  ", "ANSWER"),
     ])
     def test_action_with_whitespace(self, architect: Architect, raw_action: str, expected: str):
@@ -50,7 +46,6 @@ class TestExtractAction:
     @pytest.mark.parametrize("raw_action,expected", [
         ("ANSWER: The capital of France is Paris", "ANSWER"),
         ("CODE: I will write Python to calculate this", "CODE"),
-        ("DELEGATE: This requires splitting into subtasks", "DELEGATE"),
         ("Answer - I can directly respond", "ANSWER"),
         ("Code; generating Python solution", "CODE"),
     ])
@@ -77,9 +72,6 @@ class TestExtractAction:
         ("I need to COMPUTE this mathematically", "CODE"),
         ("Let me ANALYZE this with code", "CODE"),
         ("I will EXECUTE a Python script", "CODE"),
-        ("I need to DELEGATE this to subtasks", "DELEGATE"),
-        ("Let me SPLIT this problem into parts", "DELEGATE"),
-        ("This should be DIVIDED into smaller tasks", "DELEGATE"),
         ("I can EXPLAIN this concept directly", "ANSWER"),
         ("The response is straightforward", "ANSWER"),
         ("I know the answer directly", "ANSWER"),
@@ -94,7 +86,6 @@ class TestExtractAction:
         # When both ANSWER and CODE appear, first one wins (by position)
         ("The answer is: CODE the solution", "ANSWER"),  # ANSWER appears before CODE
         ("I think we should ANSWER this directly", "ANSWER"),
-        ("Perhaps DELEGATE is the best approach", "DELEGATE"),
         ("Use CODE to solve this, then ANSWER", "CODE"),  # CODE appears first
     ])
     def test_word_boundary_matching(self, architect: Architect, raw_action: str, expected: str):
