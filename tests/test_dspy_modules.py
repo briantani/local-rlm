@@ -48,8 +48,8 @@ async def test_architect_decision_making(setup_dspy):
     print(f"\nQuery: {query} -> Action: {result.action}")
     assert result.action in ["CODE", "ANSWER"]
 
-    # Complex/Abstract -> ANSWER or DELEGATE
+    # Complex/Abstract -> ANSWER (no DELEGATE anymore, just CODE or ANSWER)
     query_abstract = "Explain the concept of recursion."
     result_abstract = architect(query=query_abstract)
     print(f"\nQuery: {query_abstract} -> Action: {result_abstract.action}")
-    assert result_abstract.action in ["ANSWER", "DELEGATE"]
+    assert result_abstract.action in ["ANSWER", "CODE"]

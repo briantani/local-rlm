@@ -88,18 +88,6 @@ class MockResponder:
         return MockPrediction(response=self._response)
 
 
-class MockDelegator:
-    """Mock Delegator that returns predetermined subtasks."""
-
-    def __init__(self, subtasks: list[str] | None = None):
-        self.subtasks = subtasks or ["subtask1", "subtask2"]
-        self.call_count = 0
-
-    def __call__(self, task: str, context: str = ""):
-        self.call_count += 1
-        return self.subtasks
-
-
 class MockREPL:
     """Mock REPL that returns predetermined output."""
 

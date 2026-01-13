@@ -205,10 +205,10 @@ class TestStepCreationLogic:
 
     def test_step_message_creates_step(self):
         """Test that a 'step' message creates a new step."""
-        self.handle_update("step", {"action": "DELEGATE", "input": "task"})
+        self.handle_update("step", {"action": "CODE", "input": "task"})
 
         assert len(self.steps) == 1
-        assert self.steps[0]["action"] == "DELEGATE"
+        assert self.steps[0]["action"] == "CODE"
         assert self.steps[0]["status"] == "running"
 
     def test_code_without_step_creates_step(self):
@@ -270,14 +270,14 @@ class TestStepCreationLogic:
         assert self.steps[0]["status"] == "complete"
 
     def test_mixed_step_types(self):
-        """Test handling of mixed step types (CODE, DELEGATE, ANSWER)."""
-        self.handle_update("step", {"action": "DELEGATE"})
+        """Test handling of mixed step types (CODE, ANSWER)."""
+        self.handle_update("step", {"action": "CODE"})
         self.handle_update("code", {"code": "code1"})
         self.handle_update("output", {"output": "out1"})
         self.handle_update("step", {"action": "ANSWER"})
 
         assert len(self.steps) == 2
-        assert self.steps[0]["action"] == "DELEGATE"
+        assert self.steps[0]["action"] == "CODE"
         assert self.steps[0]["code"] == "code1"
         assert self.steps[1]["action"] == "ANSWER"
 
@@ -377,14 +377,14 @@ class TestCanvasDisplayHistory:
     def test_live_steps_format_conversion(self):
         """Test that live steps are properly formatted for display."""
         live_steps = [
-            {"action": "DELEGATE", "input": "subtask", "output": "result"},
+            {"action": "CODE", "input": "subtask", "output": "result"},
             {"action": "CODE", "code": "print(1)", "output": "1"}
         ]
 
         display = self.get_display_history(None, live_steps)
 
         assert display[0]["step"] == 1
-        assert display[0]["action"] == "DELEGATE"
+        assert display[0]["action"] == "CODE"
         assert display[0]["input"] == "subtask"
         assert display[1]["step"] == 2
         assert display[1]["action"] == "CODE"
