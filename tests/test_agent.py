@@ -89,6 +89,49 @@ class TestAgentUnitTests:
 
         assert "Unknown action" in result
 
+    def test_agent_artifact_tracking(self, tmp_path):
+        """Test that RLMAgent detects and registers artifacts produced during execution."""
+        import shutil
+        from src.core.run_context import RunContext
+
+        # Prepare run context and create files that code would have produced
+        run_context = RunContext(run_id="test_run", base_dir=tmp_path)
+        artifacts_dir = run_context.artifacts_dir
+        (artifacts_dir / "chart.png").write_bytes(b"fake image data")
+        (artifacts_dir / "data.csv").write_text("col1,col2\n1,2\n")
+        (artifacts_dir / "report.md").write_text("# Report\n")
+
+        # Architect returns CODE once, then ANSWER so agent runs one code step
+        call_count = [0]
+        def dynamic_architect(**kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return type('Pred', (), {'action': 'CODE'})()
+            return type('Pred', (), {'action': 'ANSWER'})()
+
+        mock_architect = type('Mock', (), {'__call__': lambda self, **kw: dynamic_architect(**kw)})()
+        mock_coder = MockCoder(code="print('done')")
+        mock_repl = MockREPL(output="done")
+        mock_responder = MockResponder(response="Done")
+
+        agent = RLMAgent(
+            max_steps=3,
+            architect=mock_architect,
+            coder=mock_coder,
+            repl=mock_repl,
+            responder=mock_responder,
+            run_context=run_context,
+        )
+
+        agent.run("Generate artifacts")
+
+        artifacts = agent.get_artifacts()
+        filenames = {a['filename'] for a in artifacts}
+        assert {'chart.png', 'data.csv', 'report.md'}.issubset(filenames)
+
+        # Clean up
+        shutil.rmtree(artifacts_dir)
+
 
 # ============================================================================
 # INTEGRATION TESTS (LLM-dependent - Slower, May Skip)
