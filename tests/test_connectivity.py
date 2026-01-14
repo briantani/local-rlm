@@ -25,6 +25,7 @@ def test_get_lm_ollama():
     assert isinstance(lm.lm, dspy.LM)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_connectivity_ollama():
     """Test actual connectivity to Ollama."""
@@ -41,6 +42,7 @@ async def test_connectivity_ollama():
 
 # We skip Gemini connectivity test by default to avoid needing a real key in CI/automated runs
 # unless the user specifically wants to run it.
+@pytest.mark.integration
 @pytest.mark.skipif(not os.environ.get("GEMINI_API_KEY"), reason="No Gemini API key")
 def test_connectivity_gemini():
     """Test actual connectivity to Gemini."""

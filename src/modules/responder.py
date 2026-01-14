@@ -23,8 +23,8 @@ class Responder(dspy.Module):
         self.respond = dspy.ChainOfThought(ResponderSignature)
         self.run_context = run_context
 
-    def forward(self, query: str, context: str = "") -> dspy.Prediction:
-        prediction = self.respond(query=query, context=context)
+    def forward(self, query: str, context: str = "", artifacts_info: str = "") -> dspy.Prediction:
+        prediction = self.respond(query=query, context=context, artifacts_info=artifacts_info)
 
         # If we have a run context with images, append them to the response
         if self.run_context:

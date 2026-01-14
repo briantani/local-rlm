@@ -30,7 +30,7 @@ def test_scan_directory(tmp_path):
     assert "[FILE] root.py" in result
     assert "sub/test.txt" in result
 
-@pytest.mark.skip(reason="Integration test - flaky due to LLM non-determinism and Ollama timeouts")
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_agent_can_see_files(tmp_path, setup_dspy_ollama):
     """

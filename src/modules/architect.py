@@ -61,8 +61,8 @@ class Architect(dspy.Module):
         # Load compiled weights if available (using centralized loader)
         load_compiled_module(self, "architect")
 
-    def forward(self, query: str, data_desc: str = "") -> dspy.Prediction:
-        prediction = self.decide(query=query, data_desc=data_desc)
+    def forward(self, query: str, data_desc: str = "", artifacts_info: str = "") -> dspy.Prediction:
+        prediction = self.decide(query=query, data_desc=data_desc, artifacts_info=artifacts_info)
 
         # Normalize and extract action from potentially verbose output
         action = self._extract_action(prediction.action)

@@ -9,18 +9,15 @@ dependencies = [
     "dspy-ai>=3.0.4",
     "python-dotenv>=1.2.1",
     "restrictedpython>=8.1",
-
     # LLM Providers
     "google-generativeai>=0.8.6",
     "openai>=2.14.0",
-
     # Web Framework (for future web UI)
     "fastapi>=0.128.0",
     "uvicorn[standard]>=0.40.0",
     "python-multipart>=0.0.21",
     "websockets>=15.0.1",
     "aiosqlite>=0.22.1",
-
     # Web Search
     "ddgs>=9.10.0",
 ]
@@ -55,11 +52,13 @@ repl = [
 ]
 
 dev = [
+    "markdown>=3.10",
     "playwright>=1.57.0",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "pytest-playwright>=0.7.2",
     "pytest-timeout>=2.4.0",
+    "weasyprint>=67.0",
 ]
 
 [tool.pytest.ini_options]

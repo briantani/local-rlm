@@ -118,6 +118,34 @@ uv run python src/main.py --prompt-file tasks/research.txt --config configs/high
 - [RLM Theory](docs/THEORY.md) - Architecture and paper details
 - [Web Interface](docs/WEB_INTERFACE.md) - Status and roadmap
 
+## Testing Locally
+
+The project uses `uv` and `pytest`. Integration tests that contact real LLM servers
+are marked with `@pytest.mark.integration` and are disabled by default. Use the
+helper script below to run tests locally.
+
+- Run unit tests (fast):
+
+```bash
+./scripts/ci/run_tests.sh
+```
+
+- Run integration tests (requires `RLM_RUN_INTEGRATION` / live LLMs):
+
+```bash
+RUN_INTEGRATION=1 ./scripts/ci/run_tests.sh
+```
+
+If you prefer to run pytest directly with `uv`:
+
+```bash
+# Unit tests only
+uv run pytest -q -m "not integration"
+
+# Integration tests (explicit opt-in)
+RLM_RUN_INTEGRATION=1 uv run pytest -q -m integration --durations=20
+```
+
 ## Architecture
 
 ```text

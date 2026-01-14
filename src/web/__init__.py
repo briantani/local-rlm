@@ -1,10 +1,11 @@
 """
-RLM Web Application.
+RLM Web Application package.
 
-FastAPI backend for the RLM Agent with REST APIs and WebSocket streaming.
-Phase 13: FastAPI Backend with WebSocket Streaming.
+Avoid importing `create_app` at package import time to prevent heavy
+side-effects (template loading, optional dependencies like weasyprint)
+when other modules import submodules such as `src.web.task_runner`.
+
+Import `create_app` explicitly where needed: `from src.web.app import create_app`.
 """
 
-from src.web.app import create_app
-
-__all__ = ["create_app"]
+__all__ = []

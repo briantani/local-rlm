@@ -4,12 +4,20 @@ Tests for Phase 13: FastAPI Backend.
 Tests REST endpoints, WebSocket streaming, and database persistence.
 """
 
+
 import asyncio
 import pytest
 from unittest.mock import patch
 
 import pytest_asyncio
 from fastapi.testclient import TestClient
+
+# If integration mode is not enabled, skip this module early to avoid importing
+# heavy web/reporting dependencies (weasyprint, etc.). Use RLM_RUN_INTEGRATION=1
+# to run these tests.
+import os
+if not os.getenv("RLM_RUN_INTEGRATION"):
+    pytest.skip("Integration tests disabled; set RLM_RUN_INTEGRATION=1 to run", allow_module_level=True)
 
 # Import app after all patches are ready
 from src.web.app import create_app

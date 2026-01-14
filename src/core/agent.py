@@ -1,4 +1,5 @@
 import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -373,13 +374,30 @@ class RLMAgent:
             if last_output:
                 architect_context += f"\n\n{last_output}"
 
+            # Build artifacts_info summary for modules that accept artifact context
+            artifacts_info = ""
+            if self.run_context and getattr(self.run_context, 'artifacts', None):
+                parts = []
+                for a in self.run_context.artifacts:
+                    fname = a.get('filename', '')
+                    section = a.get('section') or ''
+                    desc = a.get('description') or ''
+                    parts.append(f"{fname} | {a.get('type','')} | {section} | {desc}")
+                artifacts_info = "\n".join(parts)
+
             # 1. Architect decides what to do
             logger.debug(f"{indent}Thinking...")
             try:
-                # Pass metadata, not full context (paper-style)
-                decision = self.architect(query=task, data_desc=architect_context)
-                action = decision.action.upper()
-                logger.info(f"{indent}Architect Decision: {action}")
+                # Call architect with a short timeout to avoid hangs if LM is unresponsive
+                with ThreadPoolExecutor(max_workers=1) as ex:
+                    future = ex.submit(self.architect, query=task, data_desc=architect_context, artifacts_info=artifacts_info)
+                    try:
+                        decision = future.result(timeout=60)
+                        action = decision.action.upper()
+                        logger.info(f"{indent}Architect Decision: {action}")
+                    except FuturesTimeoutError:
+                        future.cancel()
+                        raise TimeoutError("Architect call timed out")
             except Exception as e:
                 logger.error(f"{indent}Architect error: {e}")
                 action = "ANSWER"
@@ -394,8 +412,18 @@ class RLMAgent:
                     logger.info(f"{indent}Context too large ({len(full_context)} chars). Using RAG-like summarization.")
                     final_answer = self._summarize_with_rag(task, full_context, indent)
                 else:
-                    response = self.responder(query=task, context=full_context)
-                    final_answer = response.response
+                    try:
+                        with ThreadPoolExecutor(max_workers=1) as ex:
+                            future = ex.submit(self.responder, query=task, context=full_context, artifacts_info=artifacts_info)
+                            response = future.result(timeout=30)
+                            final_answer = response.response
+                    except FuturesTimeoutError:
+                        future.cancel()
+                        logger.error(f"{indent}Responder call timed out")
+                        final_answer = self._generate_fallback_answer(task)
+                    except Exception as e:
+                        logger.error(f"{indent}Responder error: {e}")
+                        final_answer = self._generate_fallback_answer(task)
 
                     # Handle None response (can happen with context overflow or model issues)
                     if final_answer is None:
@@ -429,7 +457,14 @@ class RLMAgent:
                     if last_output:
                         coder_context += f"\n\n{last_output}"
 
-                    code_pred = self.coder(task=task, context_summary=coder_context)
+                    # Run coder with timeout guard to prevent long LLM hangs
+                    try:
+                        with ThreadPoolExecutor(max_workers=1) as ex:
+                            future = ex.submit(self.coder, task=task, context_summary=coder_context)
+                            code_pred = future.result(timeout=30)
+                    except FuturesTimeoutError:
+                        future.cancel()
+                        raise TimeoutError("Coder call timed out")
                     code = code_pred.python_code
                     logger.debug(f"{indent}Code Generated:\n{code}")
 

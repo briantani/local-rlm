@@ -1,5 +1,7 @@
 import os
 import pytest
+import socket
+import httpx
 from pathlib import Path
 from src.core.budget import BudgetManager
 from src.core.config_loader import load_profile
@@ -35,9 +37,23 @@ def get_lm_for_testing(provider: str = "ollama", model: str | None = None):
     Returns:
         A dspy.LM instance wrapped with BudgetWrapper
     """
+    # By default, avoid hitting external LMs during unit tests. Require
+    # explicit opt-in via the RLM_RUN_INTEGRATION env var to run integration
+    # tests that contact real model servers.
+    if provider in ("ollama", "gemini", "openai") and not os.environ.get("RLM_RUN_INTEGRATION"):
+        pytest.skip(f"Integration tests disabled (provider={provider}); set RLM_RUN_INTEGRATION=1 to enable")
+
     # Use existing test configs or create a minimal one
     if provider == "ollama":
         config_path = Path(__file__).parent.parent / "configs" / "local-only.yaml"
+        # Quick connectivity check for local Ollama server (port 11434).
+        # Prefer an HTTP health check to ensure the service responds to requests.
+        try:
+            resp = httpx.get("http://localhost:11434/v1/models", timeout=1.0)
+            if resp.status_code >= 500 or resp.status_code == 0:
+                pytest.skip("Ollama server not responding correctly; skipping Ollama tests")
+        except Exception:
+            pytest.skip("Ollama server not reachable on localhost:11434; skipping Ollama tests")
     elif provider == "gemini":
         config_path = Path(__file__).parent.parent / "configs" / "cost-effective.yaml"
     else:
@@ -59,7 +75,7 @@ class MockArchitect:
         self.action = action
         self.call_count = 0
 
-    def __call__(self, query: str, data_desc: str = ""):
+    def __call__(self, query: str, data_desc: str = "", artifacts_info: str = ""):
         self.call_count += 1
         return MockPrediction(action=self.action)
 
@@ -83,7 +99,7 @@ class MockResponder:
         self._response = response
         self.call_count = 0
 
-    def __call__(self, query: str, context: str = ""):
+    def __call__(self, query: str, context: str = "", artifacts_info: str = ""):
         self.call_count += 1
         return MockPrediction(response=self._response)
 
