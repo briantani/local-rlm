@@ -96,7 +96,7 @@ INFO: Saved final report to runs/20260113_123456/report.md
 
 Unit tests were added for:
 
-- Artifact context storage and `Responder` embedding (`tests/test_artifact_context.py`) 
+- Artifact context storage and `Responder` embedding (`tests/test_artifact_context.py`)
 - Final assembly behavior (`tests/test_final_assembly.py`)
 - Intermediate consistency checks and retry flow (`tests/test_intermediate_checks.py`)
 - Coder expected artifacts parsing (`tests/test_signature_prompts.py`)
