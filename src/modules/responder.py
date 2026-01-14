@@ -13,6 +13,7 @@ class ResponderSignature(dspy.Signature):
     """
     query = dspy.InputField(desc="The user's query.")
     context = dspy.InputField(desc="Context, including previous code execution outputs.", default="")
+    artifacts_info = dspy.InputField(desc="Structured artifact metadata (filenames, sections, descriptions).", default="")
     response = dspy.OutputField(desc="A well-formatted Markdown response answering the query.")
 
 

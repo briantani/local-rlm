@@ -16,6 +16,7 @@ class ArchitectSignature(dspy.Signature):
     """
     query = dspy.InputField(desc="The user's query or task.")
     data_desc = dspy.InputField(desc="Execution history metadata and last output preview.", default="")
+    artifacts_info = dspy.InputField(desc="Summary of known artifacts and their sections (optional).", default="")
     action = dspy.OutputField(desc="Reply with exactly one word: ANSWER or CODE.")
 
 class Architect(dspy.Module):

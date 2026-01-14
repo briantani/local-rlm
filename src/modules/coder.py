@@ -25,6 +25,9 @@ class CoderSignature(dspy.Signature):
     task = dspy.InputField(desc="The task to solve with Python code.")
     context_summary = dspy.InputField(desc="Execution history metadata.", default="")
     python_code = dspy.OutputField(desc="Executable Python code only. No markdown, no imports.")
+    # Optional: the coder can declare filenames it expects to generate.
+    # Format as a comma-separated string or list in the prediction.
+    expected_artifacts = dspy.OutputField(desc="Comma-separated filenames the code will generate (optional)", default="")
 
 class Coder(dspy.Module):
     def __init__(self):
@@ -103,7 +106,23 @@ class Coder(dspy.Module):
             # This assertion failure triggers a retry
             raise ValueError(f"Generated code has syntax error: {e}. Code was:\n{code}")
 
-        return dspy.Prediction(python_code=code)
+        # Parse special inline annotation for expected artifacts, e.g.
+        #  # EXPECTED_ARTIFACTS: sales_chart.png, data.csv
+        expected = ""
+        for line in code.splitlines():
+            line = line.strip()
+            if line.upper().startswith("# EXPECTED_ARTIFACTS:"):
+                expected = line.split(":", 1)[1].strip()
+                break
+
+        pred = dspy.Prediction(python_code=code)
+        if expected:
+            # Normalize to list-like string or list depending on dspy expectations
+            pred.expected_artifacts = [p.strip() for p in expected.split(",") if p.strip()]
+        else:
+            pred.expected_artifacts = []
+
+        return pred
 
     def _strip_imports(self, code: str) -> str:
         """Remove import statements from generated code.
