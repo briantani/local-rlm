@@ -10,7 +10,7 @@ description: |
 # Root agent configuration
 root:
   provider: ollama
-  model: qwen2.5-coder:14b
+  model: qwen3:14b
   max_steps: 24
   max_depth: 5
   pricing:
@@ -32,7 +32,7 @@ modules:
   # Architect needs reasoning - use larger model
   architect:
     provider: ollama
-    model: qwen2.5-coder:14b
+    model: qwen3:14b
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
@@ -48,7 +48,7 @@ modules:
   # Responder can use smaller model
   responder:
     provider: ollama
-    model: qwen2.5-coder:14b
+    model: qwen3:14b
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
@@ -56,7 +56,7 @@ modules:
   # Delegator uses smaller model
   delegator:
     provider: ollama
-    model: qwen2.5-coder:14b
+    model: qwen3:14b
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
