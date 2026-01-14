@@ -65,7 +65,11 @@ class RunContext:
         self,
         filename: str,
         artifact_type: str = "file",
-        description: str = ""
+        description: str = "",
+        *,
+        prompt: str | None = None,
+        section: str | None = None,
+        rationale: str | None = None,
     ) -> Path:
         """Register a new artifact and return its path.
 
@@ -73,6 +77,10 @@ class RunContext:
             filename: Name of the artifact file
             artifact_type: Type of artifact ('image', 'report', 'data', 'file')
             description: Human-readable description of the artifact
+
+            prompt: Optional prompt or instruction that generated this artifact
+            section: Optional intended report section for the artifact
+            rationale: Optional rationale or notes about why the artifact was created
 
         Returns:
             Full path where the artifact should be saved
@@ -84,6 +92,9 @@ class RunContext:
             "type": artifact_type,
             "description": description,
             "created_at": datetime.now().isoformat(),
+            "prompt": prompt,
+            "section": section,
+            "rationale": rationale,
         })
         return path
 

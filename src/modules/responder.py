@@ -55,7 +55,21 @@ class Responder(dspy.Module):
         for img in images:
             filename = img["filename"]
             description = img.get("description", filename)
-            # Use relative path for markdown
+            section = img.get("section")
+            rationale = img.get("rationale")
+            prompt = img.get("prompt")
+
+            # Optionally include intended section as a subheading
+            if section:
+                enhanced += f"### Section: {section}\n\n"
+
+            # Use relative path for markdown with description as alt text
             enhanced += f"![{description}]({filename})\n\n"
+
+            # Include rationale and prompt if available to give context to the reader
+            if rationale:
+                enhanced += f"*Rationale:* {rationale}\n\n"
+            if prompt:
+                enhanced += f"*Prompt:* `{prompt}`\n\n"
 
         return enhanced
