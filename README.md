@@ -62,6 +62,28 @@ uv run python src/main.py "Summarize quantum computing" --config configs/cost-ef
 
 See [Configuration Guide](docs/CONFIGURATION.md) for details.
 
+## Recent Changes (since Issue #26)
+
+These updates improve artifact handling, reporting, and module interfaces:
+
+- Artifact Tracking (Issue #26): The agent now automatically scans and registers files
+        created during code execution. Use `RunContext.register_artifact()` to register
+        artifacts programmatically; `RLMAgent.get_artifacts()` exposes the tracked list.
+- Artifact Context Preservation (Issue #27): Artifacts include `prompt`, `section`, and
+        `rationale` metadata. The `Responder` now embeds this context when rendering reports.
+- Final Assembly Enforcement (Issue #28): Before saving the final report the agent runs
+        `RunContext.finalize_report()` to ensure every artifact is referenced and described.
+        A summary table of all artifacts is appended to the report.
+- Intermediate Consistency Checks (Issue #29): After major CODE steps the agent validates
+        any `expected_artifacts` declared by the `Coder`. If artifacts are missing the agent
+        retries generation up to a configurable limit and logs the checks.
+- Prompt & Signature Refinement (Issue #30): DSPy module signatures were extended to
+        include artifact/context fields. `Coder` can declare expected artifacts via an
+        inline comment `# EXPECTED_ARTIFACTS: file1.png, file2.csv` which the agent uses
+        for validation and retries.
+
+See `docs/CHANGES.md` for detailed examples and guidance on using these features.
+
 ## CLI Options
 
 ```bash
