@@ -273,6 +273,16 @@ class RLMAgent:
             logger.error(f"{indent}RAG summarization failed: {e}")
             return self._generate_fallback_answer(task)
 
+    def _check_expected_artifacts(self, expected: list[str]) -> list[str]:
+        """Return list of expected filenames that are missing from run_context.artifacts."""
+        if not self.run_context:
+            return expected
+
+        existing = {a.get("filename") for a in self.run_context.artifacts}
+        missing = [f for f in expected if f not in existing]
+        logger.debug(f"Checking expected artifacts: existing={existing}, expected={expected}, missing={missing}")
+        return missing
+
     def format_context(self) -> str:
         """Formats the execution history into a string context.
 
@@ -445,6 +455,42 @@ class RLMAgent:
                     self._add_history(f"Executed Code:\n{code}", output)
                     self.repl.add_history_entry(code, output, step + 1)
 
+                    # After executing code, scan the artifacts directory and register new files
+                    try:
+                        self._scan_and_register_artifacts()
+                    except Exception:
+                        logger.exception("Artifact scanning failed after code execution")
+
+                    # If coder declared expected artifacts, validate and retry if missing
+                    expected = []
+                    if hasattr(code_pred, "expected_artifacts") and code_pred.expected_artifacts:
+                        expected = list(code_pred.expected_artifacts)
+
+                    if expected:
+                        missing = self._check_expected_artifacts(expected)
+                        retries = 0
+                        max_retries = getattr(code_pred, "max_retries", 2)
+                        while missing and retries < max_retries:
+                            retries += 1
+                            logger.warning(f"{indent}Missing artifacts after execution: {missing}. Retry {retries}/{max_retries}.")
+                            # Ask coder to regenerate or correct; re-run coder to get new code
+                            try:
+                                code_pred = self.coder(task=task, context_summary=coder_context)
+                                code = code_pred.python_code
+                                logger.debug(f"{indent}Retry Code Generated:\n{code}")
+                                output = self.repl.execute(code)
+                                self._add_history(f"Executed Code (retry {retries}):\n{code}", output)
+                                self.repl.add_history_entry(code, output, step + 1 + retries)
+                                self._scan_and_register_artifacts()
+                                missing = self._check_expected_artifacts(expected)
+                            except Exception as e:
+                                logger.error(f"{indent}Retry failed: {e}")
+                                break
+
+                        if missing:
+                            logger.error(f"{indent}Artifacts still missing after {retries} retries: {missing}")
+                            # Optionally, add to history for debugging
+                            self._add_history("Missing Artifacts", ", ".join(missing))
                     # After executing code, scan the artifacts directory and register new files
                     try:
                         self._scan_and_register_artifacts()
