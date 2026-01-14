@@ -392,8 +392,23 @@ class RLMAgent:
                         logger.warning(f"{indent}Responder returned None. Using RAG-like summarization.")
                         final_answer = self._summarize_with_rag(task, full_context, indent)
 
-                logger.info(f"{indent}Final Answer: {final_answer[:200]}..." if len(str(final_answer)) > 200 else f"{indent}Final Answer: {final_answer}")
-                return final_answer
+                    logger.info(f"{indent}Final Answer: {final_answer[:200]}..." if len(str(final_answer)) > 200 else f"{indent}Final Answer: {final_answer}")
+
+                    # Add final answer to report and perform final assembly to ensure
+                    # all artifacts are referenced and summarized.
+                    if self.run_context:
+                        try:
+                            self.run_context.add_to_report(str(final_answer))
+                            assembly = self.run_context.finalize_report()
+                            if assembly.get("added"):
+                                logger.warning(f"{indent}Final assembly added missing artifacts: {assembly.get('added')}")
+                            # Save finalized report
+                            report_path = self.run_context.save_report()
+                            logger.info(f"{indent}Saved final report to {report_path}")
+                        except Exception as e:
+                            logger.exception(f"{indent}Final assembly failed: {e}")
+
+                    return final_answer
 
             elif action == "CODE":
                 logger.info(f"{indent}Generating code...")

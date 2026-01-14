@@ -140,6 +140,68 @@ class RunContext:
         report_path.write_text(self.get_report())
         return report_path
 
+    def finalize_report(self, include_summary_table: bool = True) -> dict:
+        """Ensure every registered artifact is referenced in the report.
+
+        For any artifact not mentioned in the current report content, append a
+        descriptive entry (including section, rationale, prompt) so nothing is
+        omitted. Optionally append a summary table of all artifacts at the end.
+
+        Returns a dict with keys:
+            - added: list of filenames that were appended to the report
+            - total: total number of artifacts
+        """
+        added: list[str] = []
+
+        report_text = self.get_report()
+
+        for a in list(self.artifacts):
+            fname = a.get("filename")
+            if not fname:
+                continue
+            if fname in report_text:
+                continue
+
+            # Build a descriptive block for this artifact
+            section = a.get("section")
+            description = a.get("description") or fname
+            rationale = a.get("rationale")
+            prompt = a.get("prompt")
+            atype = a.get("type") or "file"
+
+            block = []
+            if section:
+                block.append(f"### Section: {section}")
+            block.append(f"**{description}** ({atype})")
+            if rationale:
+                block.append(f"*Rationale:* {rationale}")
+            if prompt:
+                block.append(f"*Prompt:* `{prompt}`")
+
+            # If it's an image, include markdown reference
+            if atype == "image":
+                block.append(f"![{description}]({fname})")
+
+            self._report_content.append("\n\n".join(block))
+            added.append(fname)
+
+            # Update report_text so subsequent checks see the new content
+            report_text = self.get_report()
+
+        # Optionally append a summary table
+        if include_summary_table and self.artifacts:
+            table_lines = ["\n\n---\n\n## Artifacts Summary\n", "| Filename | Type | Section | Description |", "|---|---|---|---|"]
+            for a in self.artifacts:
+                fname = a.get("filename", "")
+                atype = a.get("type", "")
+                section = a.get("section") or ""
+                desc = a.get("description") or ""
+                table_lines.append(f"| {fname} | {atype} | {section} | {desc} |")
+
+            self._report_content.append("\n".join(table_lines))
+
+        return {"added": added, "total": len(self.artifacts)}
+
     def list_images(self) -> list[dict[str, Any]]:
         """List all image artifacts.
 
