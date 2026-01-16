@@ -169,6 +169,7 @@ class TaskService:
                 config=config,
                 budget_manager=budget_manager,
                 run_context=run_context,
+                root_lm=lm,
             )
 
             # Track execution history for callbacks

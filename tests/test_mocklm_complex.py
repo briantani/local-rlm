@@ -1,7 +1,6 @@
 import dspy
 import json
 import re
-import pytest
 
 from src.core.budget import BudgetManager, BudgetWrapper
 from src.modules.coder import Coder

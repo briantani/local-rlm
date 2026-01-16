@@ -61,6 +61,8 @@ class RLMAgent:
         budget_manager: BudgetManager | None = None,
         # Run context for artifact management
         run_context: "RunContext | None" = None,
+        # Root LM to use within worker threads (thread-local contexts)
+        root_lm: dspy.LM | None = None,
         # Dependency injection parameters
         repl: CodeExecutor | None = None,
         architect: TaskRouter | None = None,
@@ -101,6 +103,9 @@ class RLMAgent:
         self.coder = coder if coder else Coder()
         self.responder = responder if responder else Responder(run_context=run_context)
 
+        # LM to be injected into worker threads via dspy.context
+        self._thread_lm = root_lm
+
         # Context summarizer for RAG-like handling of large contexts
         self.context_summarizer = ContextSummarizer(run_context=run_context)
 
@@ -134,6 +139,18 @@ class RLMAgent:
         """Thread-safe history append for Python 3.14t compatibility."""
         with self._history_lock:
             self.history.append((action, output))
+
+    def _call_in_context(self, fn, *args, **kwargs):
+        """Call a function inside a thread-local dspy context if an LM was provided.
+
+        This ensures worker threads created by ThreadPoolExecutor have the same
+        LM configuration as the main thread.
+        """
+        lm = getattr(self, "_thread_lm", None)
+        if lm is not None:
+            with dspy.context(lm=lm):
+                return fn(*args, **kwargs)
+        return fn(*args, **kwargs)
 
     def get_artifacts(self) -> list[dict]:
         """Return the list of tracked artifacts for this run.
@@ -390,7 +407,13 @@ class RLMAgent:
             try:
                 # Call architect with a short timeout to avoid hangs if LM is unresponsive
                 with ThreadPoolExecutor(max_workers=1) as ex:
-                    future = ex.submit(self.architect, query=task, data_desc=architect_context, artifacts_info=artifacts_info)
+                    future = ex.submit(
+                        self._call_in_context,
+                        self.architect,
+                        query=task,
+                        data_desc=architect_context,
+                        artifacts_info=artifacts_info,
+                    )
                     try:
                         decision = future.result(timeout=60)
                         action = decision.action.upper()
@@ -414,7 +437,13 @@ class RLMAgent:
                 else:
                     try:
                         with ThreadPoolExecutor(max_workers=1) as ex:
-                            future = ex.submit(self.responder, query=task, context=full_context, artifacts_info=artifacts_info)
+                            future = ex.submit(
+                                self._call_in_context,
+                                self.responder,
+                                query=task,
+                                context=full_context,
+                                artifacts_info=artifacts_info,
+                            )
                             response = future.result(timeout=30)
                             final_answer = response.response
                     except FuturesTimeoutError:
@@ -460,7 +489,12 @@ class RLMAgent:
                     # Run coder with timeout guard to prevent long LLM hangs
                     try:
                         with ThreadPoolExecutor(max_workers=1) as ex:
-                            future = ex.submit(self.coder, task=task, context_summary=coder_context)
+                            future = ex.submit(
+                                self._call_in_context,
+                                self.coder,
+                                task=task,
+                                context_summary=coder_context,
+                            )
                             code_pred = future.result(timeout=30)
                     except FuturesTimeoutError:
                         future.cancel()

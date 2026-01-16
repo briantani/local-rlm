@@ -1,6 +1,5 @@
 import os
 import pytest
-import socket
 import httpx
 from pathlib import Path
 from src.core.budget import BudgetManager, BudgetWrapper

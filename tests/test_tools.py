@@ -119,7 +119,7 @@ async def test_agent_web_search(setup_dspy_ollama, monkeypatch):
 
     # To avoid dependency on the LM during this unit test, inject lightweight
     # mocks for Architect/Coder/REPL so the test focuses on the search tool.
-    from tests.conftest import MockArchitect, MockCoder, MockREPL
+    from tests.conftest import MockCoder, MockREPL
 
     # Architect that returns CODE for the first step(s) then ANSWER to finish
     class ToggleArchitect:
@@ -137,7 +137,6 @@ async def test_agent_web_search(setup_dspy_ollama, monkeypatch):
     search_code = 'result = search_web("who created Python programming language")\nprint(result[0]["body"])'
     mock_coder = MockCoder(code=search_code)
     mock_repl = MockREPL(output="Guido van Rossum created Python in 1989.")
-    mock_resp = MockREPL(output="Guido van Rossum created Python in 1989.")
     # Use a simple MockResponder to avoid calling the LM for final formatting
     from tests.conftest import MockResponder
     mock_responder = MockResponder(response="Guido van Rossum created Python in 1989.")

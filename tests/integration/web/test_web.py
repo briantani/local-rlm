@@ -5,9 +5,7 @@ if not os.getenv("RLM_RUN_INTEGRATION"):
 
 import asyncio
 import pytest
-from unittest.mock import patch
 
-import pytest_asyncio
 from fastapi.testclient import TestClient
 
 # Import app after all patches are ready
