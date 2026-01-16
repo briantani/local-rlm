@@ -11,11 +11,20 @@ class LazyLogger:
     This prevents log files from being created on module import during testing.
     """
 
-    def __init__(self, name: str = "RLM", log_level: int = logging.DEBUG):
+    def __init__(self, name: str = "RLM", log_level: int = logging.INFO):
         self._name = name
         self._log_level = log_level
         self._logger: logging.Logger | None = None
         self._initialized = False
+
+    def set_level(self, level: int):
+        """Set the logging level dynamically."""
+        self._log_level = level
+        if self._initialized and self._logger:
+            self._logger.setLevel(level)
+            # Update handlers too
+            for handler in self._logger.handlers:
+                handler.setLevel(level)
 
     def _get_logger(self) -> logging.Logger:
         """Initialize the logger on first access."""

@@ -12,6 +12,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from src.core.logger import logger
+import logging
 from src.rlm.services import ConfigService, SessionService, TaskService
 
 # Load environment variables (for API keys)
@@ -54,6 +55,11 @@ def main():
         default=None,
         help="Path to a directory containing files to include in the context."
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show detailed execution logs (DEBUG level)"
+    )
 
     args = parser.parse_args()
 
@@ -73,6 +79,13 @@ def main():
             return
     else:
         task = args.task
+
+    # Configure logger based on verbose flag
+    if args.verbose:
+        logger.set_level(logging.DEBUG)
+        logger.debug("Verbose logging enabled")
+    else:
+        logger.set_level(logging.INFO)
 
     # Initialize services (Phase 12 pattern)
     config_service = ConfigService()
