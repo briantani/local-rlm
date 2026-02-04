@@ -109,7 +109,7 @@ uv run python src/main.py --prompt-file tasks/research.txt --config configs/high
 ## Web Interface
 
 > 🚧 **Work in Progress** - The web UI is under development and not fully functional.
-> Use the CLI for production tasks. See [Web Interface Status](docs/WEB_INTERFACE.md).
+> Use the CLI for tasks. See [Web Interface Status](docs/WEB_INTERFACE.md).
 
 ## Documentation
 
