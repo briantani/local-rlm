@@ -109,9 +109,9 @@ uv run <command>      # Run commands in the virtual environment
 ### Testing
 
 ```bash
-uv run pytest                     # Run all tests
-uv run pytest tests/test_repl.py  # Run specific test file
-uv run pytest -k "test_code"      # Run tests matching pattern
+uv run python -m pytest                     # Run all tests
+uv run python -m pytest tests/test_repl.py  # Run specific test file
+uv run python -m pytest -k "test_code"      # Run tests matching pattern
 ```
 
 **Testing Strategy**: Unit tests use dependency injection (see `tests/conftest.py` for `MockArchitect`, `MockCoder`, etc.). Integration tests hit real LLMs (use `@pytest.mark.integration`).
