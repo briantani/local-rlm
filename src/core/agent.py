@@ -415,7 +415,8 @@ class RLMAgent:
                         artifacts_info=artifacts_info,
                     )
                     try:
-                        decision = future.result(timeout=60)
+                        # Increased timeout for local models
+                        decision = future.result(timeout=120)
                         action = decision.action.upper()
                         logger.info(f"{indent}Architect Decision: {action}")
                     except FuturesTimeoutError:
@@ -444,7 +445,8 @@ class RLMAgent:
                                 context=full_context,
                                 artifacts_info=artifacts_info,
                             )
-                            response = future.result(timeout=30)
+                            # Increased timeout for local models
+                            response = future.result(timeout=120)
                             final_answer = response.response
                     except FuturesTimeoutError:
                         future.cancel()
@@ -495,7 +497,8 @@ class RLMAgent:
                                 task=task,
                                 context_summary=coder_context,
                             )
-                            code_pred = future.result(timeout=30)
+                            # Significantly increased timeout for code generation which can be slow locally
+                            code_pred = future.result(timeout=600)
                     except FuturesTimeoutError:
                         future.cancel()
                         raise TimeoutError("Coder call timed out")

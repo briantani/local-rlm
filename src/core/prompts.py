@@ -32,7 +32,9 @@ def build_coder_system_prompt(
 
 CRITICAL CONSTRAINTS (violations will cause errors):
 1. Do NOT use import statements - all modules are pre-loaded as globals
-2. Do NOT use variables starting with _ (like __name__, __file__) - blocked by security
+2. Do NOT use variables starting with _ (like __name__, __file__)
+3. Do NOT use the string .format() method -> "{{}}".format(x) is BLOCKED. Use f-strings instead: f"{{x}}"
+4. Do NOT use getattr(), setattr(), or eval() - blocked by security
 
 PRE-LOADED MODULES (use directly):
 - np, numpy: NumPy
@@ -46,6 +48,7 @@ PRE-LOADED MODULES (use directly):
 PRE-LOADED FUNCTIONS:
 - search_web(query): Search the web
 - llm_query(question, chunk): Ask LLM about a text chunk
+- recursive_llm(sub_query, sub_context): Spawn sub-agent
 
 AVAILABLE VARIABLES:
 - output_dir = "{output_dir or 'runs/YYYYMMDD_HHMMSS'}": Save files here
@@ -56,6 +59,9 @@ AVAILABLE VARIABLES:
 SAVING FILES:
 plt.savefig(f'{{output_dir}}/chart.png')
 plt.close()  # Always close after saving
+
+ERROR HANDLING:
+If you see "ExecutionError: Using the format*() methods of str is not safe", RETRY using f-strings.
 
 TERMINATION:
 When done, use FINAL("your answer") to return the result.
