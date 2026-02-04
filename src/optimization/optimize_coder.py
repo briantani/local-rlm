@@ -20,42 +20,12 @@ import os
 from pathlib import Path
 
 import dspy
-from dspy.teleprompt import LabeledFewShot, BootstrapFewShot, MIPROv2, SIMBA
 
 from src.modules.coder import Coder
-from src.core.repl import PythonREPL
-from src.core.logger import logger
 from src.optimization.data import get_coder_data, split_train_val
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
-def create_lm_for_optimization(provider: str) -> dspy.LM:
-    """
-    Simple LM factory for optimization scripts.
-
-    Unlike the full agent which uses ProfileConfig and BudgetWrapper,
-    optimization scripts just need a basic LM connection.
-    """
-    match provider.lower():
-        case "gemini":
-            api_key = os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY not found in environment variables.")
-            return dspy.LM("gemini/gemini-2.5-flash", api_key=api_key)
-
-        case "openai":
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("OPENAI_API_KEY not found in environment variables.")
-            return dspy.LM("openai/gpt-4o-mini", api_key=api_key)
-
-        case "ollama":
-            return dspy.LM("ollama/qwen2.5-coder:7b", api_base="http://localhost:11434")
-
-        case _:
-            raise ValueError(f"Unsupported provider: {provider}")
+from src.optimization.optimizer_factory import OptimizerFactory
+from src.optimization.metrics import CoderMetrics
+from src.core.logger import logger
 
 
 def setup_mock_files():
@@ -80,298 +50,6 @@ def cleanup_mock_files():
     for f in ["dataset.xlsx", "data.csv"]:
         if os.path.exists(f):
             os.remove(f)
-
-
-def _setup_test_globals(repl: PythonREPL) -> None:
-    """
-    Set up paper-style globals for code validation.
-
-    Creates mock versions of execution history, llm_query, etc.
-    so that code examples can execute during optimization.
-
-    Includes both underscore variables (for compatibility) and simple aliases.
-    """
-    # Mock execution history with sample data
-    mock_history = [
-        {
-            "step": 1,
-            "code": "results = search_web('AI research')",
-            "output": "Found 5 articles about AI advancements...",
-            "output_length": 500,
-        },
-        {
-            "step": 2,
-            "code": "print(len(results))",
-            "output": "5",
-            "output_length": 1,
-        },
-    ]
-
-    # Set both underscore and simple alias versions
-    repl.globals["__execution_history__"] = mock_history
-    repl.globals["history"] = mock_history  # Simple alias
-
-    # Mock llm_query function
-    def mock_llm_query(query: str, context: str = "") -> str:
-        """Mock llm_query that returns a reasonable placeholder."""
-        return f"[LLM Response to: {query[:50]}...]"
-
-    repl.globals["llm_query"] = mock_llm_query
-
-    # Task variable - both underscore and simple alias
-    repl.globals["__task__"] = "Test task for optimization"
-    repl.globals["task"] = "Test task for optimization"  # Simple alias
-
-    # Output directory - both underscore and simple alias
-    repl.globals["__artifacts_dir__"] = "/tmp/test_artifacts"
-    repl.globals["output_dir"] = "/tmp/test_artifacts"  # Simple alias
-
-    # Input/context directory
-    repl.globals["__context_dir__"] = "/tmp/test_context"
-    repl.globals["input_dir"] = "/tmp/test_context"  # Simple alias
-
-    # Context variable (empty by default)
-    repl.globals["context"] = ""
-
-
-def validate_code_execution(example, prediction, trace=None) -> float:
-    """
-    Metric: Validate that generated code executes successfully.
-
-    Compatible with both BootstrapFewShot (prediction=Prediction) and SIMBA (prediction=dict).
-
-    Scoring:
-    - 0.0: Syntax error or execution error
-    - 0.5: Executes but output doesn't match expected
-    - 1.0: Executes and matches expected output (if provided)
-
-    Returns:
-        Float score for the prediction
-    """
-    repl = PythonREPL()
-
-    # Set up paper-style globals for testing
-    _setup_test_globals(repl)
-
-    try:
-        # Handle both Prediction object and dict
-        if isinstance(prediction, dict):
-            code = prediction.get("python_code", prediction.get("code", ""))
-        else:
-            code = prediction.python_code
-
-        if not code:
-            return 0.0
-
-        output = repl.execute(code)
-
-        # Check for errors
-        if "Traceback" in output or "Error" in output:
-            return 0.0
-
-        # Check expected output if provided
-        if hasattr(example, "expected_output") and example.expected_output:
-            if example.expected_output in output:
-                return 1.0
-            return 0.5  # Executed but wrong output
-
-        return 1.0  # No expected output, execution success is enough
-
-    except Exception:
-        return 0.0
-
-
-def validate_code_with_feedback(example, prediction, trace=None, pred_name=None, pred_trace=None):
-    """
-    GEPA-compatible metric with textual feedback.
-
-    Returns dict with score and feedback for GEPA's reflective optimization.
-    """
-    repl = PythonREPL()
-
-    # Set up paper-style globals for testing
-    _setup_test_globals(repl)
-
-    try:
-        # Handle both Prediction object and dict
-        if isinstance(prediction, dict):
-            code = prediction.get("python_code", prediction.get("code", ""))
-        else:
-            code = prediction.python_code
-
-        if not code:
-            return {
-                "score": 0.0,
-                "feedback": "No code generated"
-            }
-
-        output = repl.execute(code)
-
-        if "Traceback" in output or "Error" in output:
-            return {
-                "score": 0.0,
-                "feedback": f"Code execution failed with error: {output[:200]}"
-            }
-
-        if hasattr(example, "expected_output") and example.expected_output:
-            if example.expected_output in output:
-                return {"score": 1.0, "feedback": "Code executed correctly with expected output."}
-            return {
-                "score": 0.5,
-                "feedback": f"Code executed but output '{output[:100]}' doesn't contain expected '{example.expected_output}'"
-            }
-
-        return {"score": 1.0, "feedback": "Code executed successfully without errors."}
-
-    except Exception as e:
-        return {"score": 0.0, "feedback": f"Exception during execution: {str(e)}"}
-
-
-def optimize_with_labeled_fewshot(trainset: list, save_path: str, k: int = 5):
-    """
-    Optimize using LabeledFewShot.
-
-    Simplest optimizer: Just selects k examples as demos.
-    No bootstrapping, no validation. Fast but less powerful.
-    """
-    logger.info(f"Using LabeledFewShot optimizer (k={k})...")
-
-    teleprompter = LabeledFewShot(k=k)
-
-    coder = Coder()
-    compiled = teleprompter.compile(coder, trainset=trainset)
-
-    compiled.save(save_path)
-    logger.info(f"Saved to {save_path}")
-
-
-def optimize_with_bootstrap(trainset: list, save_path: str):
-    """
-    Optimize using BootstrapFewShot.
-
-    Creates mock files, runs code, validates output.
-    Keeps only examples that pass the metric.
-    """
-    logger.info("Using BootstrapFewShot optimizer...")
-
-    setup_mock_files()
-
-    try:
-        teleprompter = BootstrapFewShot(
-            metric=validate_code_execution,
-            max_bootstrapped_demos=4,
-            max_labeled_demos=4,
-        )
-
-        coder = Coder()
-        compiled = teleprompter.compile(coder, trainset=trainset)
-
-        compiled.save(save_path)
-        logger.info(f"Saved to {save_path}")
-    finally:
-        cleanup_mock_files()
-
-
-def optimize_with_mipro(trainset: list, valset: list, save_path: str, mode: str = "light"):
-    """
-    Optimize using MIPROv2.
-
-    Full optimization: instructions + demos via Bayesian optimization.
-    Requires more examples and compute but produces best results.
-    """
-    logger.info(f"Using MIPROv2 optimizer (mode={mode})...")
-
-    setup_mock_files()
-
-    try:
-        teleprompter = MIPROv2(
-            metric=validate_code_execution,
-            auto=mode,
-            num_threads=4,
-            verbose=True,
-        )
-
-        coder = Coder()
-        compiled = teleprompter.compile(
-            coder,
-            trainset=trainset,
-            valset=valset,
-            max_bootstrapped_demos=3,
-            max_labeled_demos=3,
-        )
-
-        compiled.save(save_path)
-        logger.info(f"Saved to {save_path}")
-    finally:
-        cleanup_mock_files()
-
-
-def optimize_with_simba(trainset: list, save_path: str):
-    """
-    Optimize using SIMBA (Stochastic Introspective Mini-Batch Ascent).
-
-    LLM analyzes its own code generation failures and generates improvement rules.
-    Good for learning from execution errors.
-    """
-    logger.info("Using SIMBA optimizer...")
-
-    setup_mock_files()
-
-    try:
-        teleprompter = SIMBA(
-            metric=validate_code_execution,
-            bsize=min(32, len(trainset)),
-            num_candidates=6,
-            max_steps=8,
-            max_demos=4,
-            num_threads=4,
-        )
-
-        coder = Coder()
-        compiled = teleprompter.compile(coder, trainset=trainset)
-
-        compiled.save(save_path)
-        logger.info(f"Saved to {save_path}")
-    finally:
-        cleanup_mock_files()
-
-
-def optimize_with_gepa(trainset: list, valset: list, save_path: str, mode: str = "light"):
-    """
-    Optimize using GEPA (Genetic-Pareto Reflective Optimizer).
-
-    Uses execution traces and error messages as feedback for reflective improvement.
-    Particularly good for code generation where errors are informative.
-    """
-    try:
-        from dspy.teleprompt import GEPA
-    except ImportError:
-        logger.error("GEPA requires the 'gepa' package. Install with: pip install gepa")
-        return
-
-    logger.info(f"Using GEPA optimizer (mode={mode})...")
-
-    setup_mock_files()
-
-    try:
-        teleprompter = GEPA(
-            metric=validate_code_with_feedback,
-            auto=mode,
-            num_threads=4,
-            track_stats=True,
-        )
-
-        coder = Coder()
-        compiled = teleprompter.compile(
-            coder,
-            trainset=trainset,
-            valset=valset,
-        )
-
-        compiled.save(save_path)
-        logger.info(f"Saved to {save_path}")
-    finally:
-        cleanup_mock_files()
 
 
 def main():
@@ -403,7 +81,7 @@ def main():
     # Configure LM
     logger.info(f"Initializing LLM ({args.provider}) for optimization...")
     try:
-        lm = create_lm_for_optimization(args.provider)
+        lm = OptimizerFactory.create_lm(args.provider)
         dspy.settings.configure(lm=lm)
         logger.info(f"LM configured: {lm.model}")
     except Exception as e:
@@ -418,22 +96,54 @@ def main():
     project_root = Path(__file__).parent.parent.parent
     save_path = project_root / "src/modules/coder_compiled.json"
 
+    # Run optimization based on selected optimizer
     if args.optimizer == "labeled":
-        optimize_with_labeled_fewshot(full_dataset, str(save_path), k=args.k)
+        OptimizerFactory.run_labeled_fewshot(
+            Coder,
+            full_dataset,
+            save_path,
+            k=args.k,
+        )
     elif args.optimizer == "bootstrap":
-        optimize_with_bootstrap(full_dataset, str(save_path))
+        OptimizerFactory.run_bootstrap(
+            Coder,
+            full_dataset,
+            save_path,
+            CoderMetrics.validate_code_execution,
+            setup_fn=setup_mock_files,
+            cleanup_fn=cleanup_mock_files,
+        )
     elif args.optimizer == "simba":
-        optimize_with_simba(full_dataset, str(save_path))
+        OptimizerFactory.run_simba(
+            Coder,
+            full_dataset,
+            save_path,
+            CoderMetrics.validate_code_execution,
+        )
     elif args.optimizer.startswith("mipro-"):
         trainset, valset = split_train_val(full_dataset)
         logger.info(f"Split: {len(trainset)} train, {len(valset)} val")
         mode = args.optimizer.replace("mipro-", "")
-        optimize_with_mipro(trainset, valset, str(save_path), mode)
+        OptimizerFactory.run_mipro(
+            Coder,
+            trainset,
+            valset,
+            save_path,
+            CoderMetrics.validate_code_execution,
+            mode=mode,
+        )
     elif args.optimizer.startswith("gepa-"):
         trainset, valset = split_train_val(full_dataset)
         logger.info(f"Split: {len(trainset)} train, {len(valset)} val")
         mode = args.optimizer.replace("gepa-", "")
-        optimize_with_gepa(trainset, valset, str(save_path), mode)
+        OptimizerFactory.run_gepa(
+            Coder,
+            trainset,
+            valset,
+            save_path,
+            CoderMetrics.validate_code_with_feedback,
+            mode=mode,
+        )
 
     logger.info("Done!")
 
