@@ -5,13 +5,17 @@ class CoderSignature(dspy.Signature):
     """
     Generate Python code to solve the task. Print results to stdout.
 
-    RULES:
-    - NO import statements - all modules are pre-loaded
-    - NO subprocess, os.system, or shell commands
-    - Use plt.savefig(), NOT plt.show()
+    CRITICAL RESTRICTEDPYTHON RULES:
+    - NO import statements (all pre-loaded: np, pd, plt, sns, re, json, math, datetime, Path)
+    - NO .format() string method - use f-strings: f"{x}" not "{}".format(x)
+    - NO underscore variables (__name__, __file__, __dict__)
+    - NO getattr, setattr, eval, exec
+    - Use simple assignments: x = 5 (NOT complex attribute access)
 
-    PRE-LOADED: np, pd, plt, sns, scipy_stats, sklearn, re, json, math, datetime,
-    Path, os.path, openpyxl, pdfplumber, docx, Counter, defaultdict, StringIO
+    COMMON ERROR FIXES:
+    ❌ "{}".format(x) -> ✅ f"{x}"
+    ❌ import pandas -> ✅ pd (already available)
+    ❌ df['col'] += 1 -> ✅ df['col'] = df['col'] + 1 (for complex cases)
 
     VARIABLES: output_dir, input_dir, history, task, context
 
@@ -37,7 +41,14 @@ class Coder(dspy.Module):
         # Add examples for file handling and paper-style patterns
         # IMPORTANT: Use simple variable names (output_dir, history, task) not underscored versions
         # IMPORTANT: No import statements - modules are pre-loaded
+        # IMPORTANT: RestrictedPython-safe patterns (no .format(), use f-strings)
         self.generate_code.demos = [
+            # RestrictedPython-safe string formatting - CRITICAL PATTERN
+            dspy.Example(
+                task="Generate a greeting message with the user's name",
+                context_summary="user_name = 'Alice'",
+                python_code="user_name = 'Alice'\n# Use f-strings (safe), NOT .format() (blocked)\nmessage = f'Hello, {user_name}! Welcome to RLM.'\nprint(message)"
+            ).with_inputs("task", "context_summary"),
             # Basic file operations - NO IMPORTS needed
             dspy.Example(
                 task="Read the CSV file 'data/sales.csv' and show the first 5 rows",
@@ -48,7 +59,13 @@ class Coder(dspy.Module):
             dspy.Example(
                 task="Create a bar chart of sales data and save it",
                 context_summary="output_dir = 'runs/20260109_123456'",
-                python_code="data = {'Q1': 100, 'Q2': 150, 'Q3': 120, 'Q4': 180}\nplt.figure(figsize=(10, 6))\nplt.bar(data.keys(), data.values())\nplt.title('Quarterly Sales')\nplt.savefig(f'{output_dir}/sales_chart.png')\nplt.close()\nprint('Chart saved to output_dir')"
+                python_code="data = {'Q1': 100, 'Q2': 150, 'Q3': 120, 'Q4': 180}\nplt.figure(figsize=(10, 6))\nplt.bar(data.keys(), data.values())\nplt.title('Quarterly Sales')\nplt.savefig(f'{output_dir}/sales_chart.png')\nplt.close()\nprint(f'Chart saved to {output_dir}/sales_chart.png')"
+            ).with_inputs("task", "context_summary"),
+            # DataFrame operations - safe assignment patterns
+            dspy.Example(
+                task="Calculate total sales from price and quantity columns",
+                context_summary="DataFrame has 'price' and 'qty' columns",
+                python_code="# Safe pattern: simple column assignment\ndf['total'] = df['price'] * df['qty']\nprint(f'Total sales: ${df[\"total\"].sum():.2f}')\nprint(df[['price', 'qty', 'total']].head())"
             ).with_inputs("task", "context_summary"),
             dspy.Example(
                 task="Search for latest AI news",
