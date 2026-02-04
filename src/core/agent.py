@@ -190,6 +190,15 @@ class RLMAgent:
         """Get a preview of the last output for decision making."""
         return self._context.get_last_output_preview(self.repl)
 
+    @property
+    def history(self) -> list[tuple[str, str]]:
+        """Get the execution history of this agent.
+
+        Returns:
+            List of (action, output) tuples
+        """
+        return self._context.history
+
     def run(self, task: str) -> str:
         """
         Executes the main loop to solve the task.
