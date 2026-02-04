@@ -371,7 +371,7 @@ class TestTaskServiceMocked:
 
         task_service = TaskService(config_service, session)
 
-        keys = task_service._get_api_keys()
+        keys = task_service.api_key_manager.get_api_keys()
 
         assert keys.get("gemini") == "session-key"
 
@@ -389,7 +389,7 @@ class TestTaskServiceMocked:
         os.environ["GEMINI_API_KEY"] = "env-key"
 
         try:
-            keys = task_service._get_api_keys()
+            keys = task_service.api_key_manager.get_api_keys()
             assert keys.get("gemini") == "env-key"
         finally:
             if original:
@@ -409,7 +409,7 @@ class TestTaskServiceMocked:
         # Should raise if gemini key is missing for gemini profile
         if config.root.provider.lower() == "gemini":
             with pytest.raises(ValueError) as exc_info:
-                task_service._validate_api_keys(config, {})
+                task_service.api_key_manager.validate_api_keys(config, {})
             assert "gemini" in str(exc_info.value).lower()
 
     def test_estimate_cost(self):
@@ -443,25 +443,21 @@ class TestREPLPersistence:
         config_service = ConfigService()
         task_service = TaskService(config_service)
 
-        # Clear any existing state
-        task_service._repl_storage.clear()
-
         # Create a REPL with some state
         repl = PythonREPL()
         repl.execute("x = 42")
         repl.execute("y = 'hello'")
 
-        # Manually store it
+        # Store it via the manager
         task_id = "test-task-123"
-        task_service._repl_storage[task_id] = repl
+        task_service.repl_manager.store(task_id, repl)
 
         # Check has_repl_state
         assert task_service.has_repl_state(task_id)
         assert not task_service.has_repl_state("nonexistent-task")
 
         # Retrieve and verify
-        with task_service._storage_lock:
-            retrieved_repl = task_service._repl_storage[task_id]
+        retrieved_repl = task_service.repl_manager.retrieve(task_id)
 
         # Variables are stored in locals dict
         assert retrieved_repl.locals.get("x") == 42
@@ -479,7 +475,7 @@ class TestREPLPersistence:
         task_id = "test-task-456"
         repl = PythonREPL()
         repl.execute("z = 100")
-        task_service._repl_storage[task_id] = repl
+        task_service.repl_manager.store(task_id, repl)
 
         # Verify it exists
         assert task_service.has_repl_state(task_id)
@@ -501,7 +497,7 @@ class TestREPLPersistence:
         task_service = TaskService(config_service)
 
         # Clear any state
-        task_service._repl_storage.clear()
+        task_service.repl_manager.clear_all()
 
         with pytest.raises(ValueError) as exc_info:
             task_service.run_followup(
@@ -511,4 +507,5 @@ class TestREPLPersistence:
             )
 
         assert "No REPL state found" in str(exc_info.value)
+
 

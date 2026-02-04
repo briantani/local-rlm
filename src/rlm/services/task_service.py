@@ -5,11 +5,10 @@ Orchestrates agent execution, providing a clean interface for running tasks
 that can be shared between CLI and Web interfaces.
 
 Phase 12: Core Library Refactoring
+Phase 6: Refactored to use ApiKeyManager and ReplStateManager
 """
 
 import logging
-import os
-import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -19,9 +18,10 @@ import dspy
 
 from src.config import get_lm_for_role
 from src.core.agent import RLMAgent
+from src.core.api_key_manager import ApiKeyManager
 from src.core.budget import BudgetManager
 from src.core.config_loader import ProfileConfig
-from src.core.repl import PythonREPL
+from src.core.repl_state_manager import ReplStateManager
 from src.core.run_context import RunContext
 from src.rlm.services.config_service import ConfigService
 from src.rlm.services.session_service import Session
@@ -86,10 +86,6 @@ class TaskService:
     - REPL state persistence for follow-up queries
     """
 
-    # Class-level REPL storage (in-memory, per task_id)
-    _repl_storage: dict[str, PythonREPL] = {}
-    _storage_lock = threading.Lock()
-
     def __init__(
         self,
         config_service: ConfigService,
@@ -104,6 +100,10 @@ class TaskService:
         """
         self.config_service = config_service
         self.session = session
+
+        # Initialize managers (Phase 6 refactoring)
+        self.api_key_manager = ApiKeyManager(session)
+        self.repl_manager = ReplStateManager()
 
     def run_task(
         self,
@@ -133,16 +133,16 @@ class TaskService:
         started_at = datetime.now()
 
         # Get API keys from session or environment
-        api_keys = self._get_api_keys()
+        api_keys = self.api_key_manager.get_api_keys()
 
         # Load config with API keys
         config = self._load_config_with_keys(config_name, api_keys)
 
         # Validate required API keys
-        self._validate_api_keys(config, api_keys)
+        self.api_key_manager.validate_api_keys(config, api_keys)
 
         # Set up API keys in environment for DSPy
-        self._configure_environment(api_keys)
+        self.api_key_manager.configure_environment(api_keys)
 
         # Initialize budget manager
         BudgetManager._clear()  # Clear singleton for fresh start
@@ -218,9 +218,7 @@ class TaskService:
 
             # Store REPL state for follow-up queries
             if task_id:
-                with self._storage_lock:
-                    self._repl_storage[task_id] = agent.repl
-                    logger.info(f"Stored REPL state for task {task_id}")
+                self.repl_manager.store(task_id, agent.repl)
 
             # Get cost breakdown
             breakdown = budget_manager.get_breakdown()
@@ -247,38 +245,6 @@ class TaskService:
                 generated_images=run_context.list_images(),
             )
 
-    def _get_api_keys(self) -> dict[str, str]:
-        """
-        Get API keys from session or environment variables.
-
-        Priority:
-        1. Session API keys (if session exists)
-        2. Environment variables (fallback)
-
-        Returns:
-            Dict mapping provider names to API keys
-        """
-        api_keys: dict[str, str] = {}
-
-        # Try session first
-        if self.session:
-            api_keys.update(self.session.api_keys)
-
-        # Fill in missing keys from environment
-        env_mappings = {
-            "gemini": "GEMINI_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY",
-        }
-
-        for provider, env_var in env_mappings.items():
-            if provider not in api_keys:
-                value = os.getenv(env_var)
-                if value:
-                    api_keys[provider] = value
-
-        return api_keys
-
     def _load_config_with_keys(
         self,
         config_name: str,
@@ -301,65 +267,6 @@ class TaskService:
             config = self.config_service.load_with_keys(config_name, api_keys)
 
         return config
-
-    def _validate_api_keys(
-        self,
-        config: ProfileConfig,
-        api_keys: dict[str, str]
-    ) -> None:
-        """
-        Validate that required API keys are present.
-
-        Args:
-            config: The profile configuration
-            api_keys: Available API keys
-
-        Raises:
-            ValueError: If required keys are missing
-        """
-        required_providers = set()
-
-        # Check root and delegate providers
-        for provider in [config.root.provider, config.delegate.provider]:
-            provider = provider.lower()
-            if provider != "ollama":  # Ollama is local, no key needed
-                required_providers.add(provider)
-
-        # Check module overrides
-        if config.modules:
-            for module in [config.modules.architect, config.modules.coder,
-                          config.modules.responder, config.modules.delegator]:
-                if module and module.provider.lower() != "ollama":
-                    required_providers.add(module.provider.lower())
-
-        # Find missing keys
-        missing = [p for p in required_providers if p not in api_keys]
-
-        if missing:
-            raise ValueError(
-                f"Missing API keys for providers: {', '.join(missing)}. "
-                f"Set them in the session or environment variables."
-            )
-
-    def _configure_environment(self, api_keys: dict[str, str]) -> None:
-        """
-        Configure environment variables for DSPy.
-
-        DSPy reads API keys from environment, so we need to set them
-        from our session/runtime keys.
-
-        Args:
-            api_keys: Dict of API keys
-        """
-        env_mappings = {
-            "gemini": "GEMINI_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY",
-        }
-
-        for provider, env_var in env_mappings.items():
-            if provider in api_keys:
-                os.environ[env_var] = api_keys[provider]
 
     def estimate_cost(
         self,
@@ -418,8 +325,7 @@ class TaskService:
             ValueError: If no REPL state found for task_id
         """
         # Retrieve stored REPL
-        with self._storage_lock:
-            repl = self._repl_storage.get(task_id)
+        repl = self.repl_manager.retrieve(task_id)
 
         if not repl:
             raise ValueError(
@@ -428,10 +334,10 @@ class TaskService:
             )
 
         # Get API keys and load config
-        api_keys = self._get_api_keys()
+        api_keys = self.api_key_manager.get_api_keys()
         config = self._load_config_with_keys(config_name, api_keys)
-        self._validate_api_keys(config, api_keys)
-        self._configure_environment(api_keys)
+        self.api_key_manager.validate_api_keys(config, api_keys)
+        self.api_key_manager.configure_environment(api_keys)
 
         # Initialize budget manager
         BudgetManager._clear()
@@ -457,8 +363,7 @@ class TaskService:
         answer = agent.run(query)
 
         # Update stored REPL (it may have new variables)
-        with self._storage_lock:
-            self._repl_storage[task_id] = agent.repl
+        self.repl_manager.store(task_id, agent.repl)
 
         return answer
 
@@ -469,10 +374,7 @@ class TaskService:
         Args:
             task_id: Task identifier
         """
-        with self._storage_lock:
-            if task_id in self._repl_storage:
-                del self._repl_storage[task_id]
-                logger.info(f"Cleared REPL state for task {task_id}")
+        self.repl_manager.clear(task_id)
 
     def has_repl_state(self, task_id: str) -> bool:
         """
@@ -484,5 +386,4 @@ class TaskService:
         Returns:
             True if REPL state exists
         """
-        with self._storage_lock:
-            return task_id in self._repl_storage
+        return self.repl_manager.has(task_id)

@@ -5,13 +5,12 @@ Manages loading, listing, and validating configuration profiles.
 Wraps the config_loader functionality with a service interface.
 
 Phase 12: Core Library Refactoring
+Phase 5: Refactored to delegate YAML parsing to ConfigLoader
 """
 
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-
-import yaml
 
 from src.core.config_loader import (
     ConfigLoader,
@@ -140,34 +139,28 @@ class ConfigService:
             ProfileSummary or None if parsing fails
         """
         try:
-            with open(yaml_path, "r") as f:
-                raw = yaml.safe_load(f)
+            # Use ConfigLoader to parse the profile
+            config = self._loader.load(yaml_path)
 
-            if not raw:
-                return None
-
-            root = raw.get("root", {})
-            delegate = raw.get("delegate", {})
-            budget = raw.get("budget", {})
-            modules = raw.get("modules", {})
-            coder = modules.get("coder", {})
-
-            # If no coder module, use "(uses root model)" as display text
-            coder_model = coder.get("model", "(uses root model)")
-            coder_provider = coder.get("provider", root.get("provider", "unknown"))
+            # Extract coder module info if present
+            coder_model = "(uses root model)"
+            coder_provider = config.root.provider
+            if config.modules and config.modules.coder:
+                coder_model = config.modules.coder.model
+                coder_provider = config.modules.coder.provider
 
             return ProfileSummary(
                 name=yaml_path.stem,
-                description=raw.get("description", ""),
-                root_model=root.get("model", "unknown"),
-                root_provider=root.get("provider", "unknown"),
-                delegate_model=delegate.get("model", "unknown"),
-                delegate_provider=delegate.get("provider", "unknown"),
+                description=config.description,
+                root_model=config.root.model,
+                root_provider=config.root.provider,
+                delegate_model=config.delegate.model,
+                delegate_provider=config.delegate.provider,
                 coder_model=coder_model,
                 coder_provider=coder_provider,
-                max_budget=budget.get("max_usd", 1.0),
-                max_steps=root.get("max_steps", 10),
-                max_depth=root.get("max_depth", 3),
+                max_budget=config.budget.max_usd,
+                max_steps=config.root.max_steps,
+                max_depth=config.root.max_depth,
             )
         except Exception as e:
             logger.error(f"Error parsing {yaml_path}: {e}")
