@@ -7,12 +7,16 @@ from src.core.module_loader import load_compiled_module
 
 class ArchitectSignature(dspy.Signature):
     """
-    Decide: CODE or ANSWER?
+    Decide: CODE or CODE?
 
-    CODE: For computation, file reading, data analysis, web search, or visualization.
-    ANSWER: When the answer is clearly visible in the last output.
+    CODE: For any task requiring:
+    - Computation, file reading, data analysis, web search, or visualization
+    - Creating images, charts, graphs, plots, or any visual output
+    - Generating reports with embedded visualizations
+    - Data processing, research analysis, or complex reasoning with outputs
 
-    If unsure, choose CODE.
+    ANSWER: Only when the complete answer is already visible in the execution history.
+    If unsure or task involves any data processing, generation, or visualization, choose CODE.
     """
     query = dspy.InputField(desc="The user's query or task.")
     data_desc = dspy.InputField(desc="Execution history metadata and last output preview.", default="")
@@ -44,6 +48,12 @@ class Architect(dspy.Module):
                 data_desc="",
                 action="CODE"
             ).with_inputs("query", "data_desc"),
+            # Research task with visualizations → CODE (CRITICAL)
+            dspy.Example(
+                query="Conduct a comprehensive analysis with visualizations, data tables, and trend analysis. Generate timeline charts, bar charts, line graphs, and heat maps.",
+                data_desc="",
+                action="CODE"
+            ).with_inputs("query", "data_desc"),
             # After successful computation → ANSWER
             dspy.Example(
                 query="What is 2+2?",
@@ -54,6 +64,12 @@ class Architect(dspy.Module):
             dspy.Example(
                 query="Summarize this CSV file.",
                 data_desc="Execution History: 1 step.\nLast output: DataFrame with 1000 rows loaded.",
+                action="CODE"
+            ).with_inputs("query", "data_desc"),
+            # Report generation with plots → CODE
+            dspy.Example(
+                query="Produce a comprehensive markdown report with embedded data visualizations saved as PNG, comparison tables, and citations.",
+                data_desc="",
                 action="CODE"
             ).with_inputs("query", "data_desc"),
         ]

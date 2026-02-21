@@ -1,0 +1,79 @@
+# Vision Critic Profile
+# Enables automatic visualization refinement with vision-capable critic.
+# Uses free Ollama Cloud vision model for cost-effective quality assurance.
+
+profile_name: "Vision Critic (Quality Assurance)"
+description: |
+  Enables automatic visualization refinement with a vision-capable critic.
+  Validates charts, plots, and images for quality and clarity through 3 rounds of refinement.
+
+  Uses free Ollama Cloud vision model (qwen3-vl:235b-instruct-cloud) for zero-cost refinement.
+  Perfect for data analysis tasks that generate charts and reports.
+
+# Root agent configuration
+root:
+  provider: ollama
+  model: gpt-oss:120b-cloud
+  max_steps: 20  # More steps to accommodate refinement loops
+  max_depth: 3
+  pricing:
+    input_per_1m: 0.0
+    output_per_1m: 0.0
+
+# Sub-agent configuration (spawned by recursive_llm() in generated code)
+delegate:
+  provider: ollama
+  model: qwen3-coder-next:cloud
+  max_steps: 12
+  max_depth: 1
+  pricing:
+    input_per_1m: 0.0
+    output_per_1m: 0.0
+
+# Per-module overrides for optimal performance
+modules:
+  # Architect uses reasoning model
+  architect:
+    provider: ollama
+    model: gpt-oss:120b-cloud
+    pricing:
+      input_per_1m: 0.0
+      output_per_1m: 0.0
+
+  # Coder uses specialized coding model
+  coder:
+    provider: ollama
+    model: qwen3-coder-next:cloud
+    pricing:
+      input_per_1m: 0.0
+      output_per_1m: 0.0
+
+  # Responder generates final reports
+  responder:
+    provider: ollama
+    model: gpt-oss:120b-cloud
+    pricing:
+      input_per_1m: 0.0
+      output_per_1m: 0.0
+
+  # NEW: Critic validates visualizations (OPTIONAL)
+  critic:
+    provider: ollama
+    model: qwen3-vl:235b-instruct-cloud  # Vision-capable, free, cloud-hosted
+    pricing:
+      input_per_1m: 0.0   # Free!
+      output_per_1m: 0.0  # Free!
+
+# Global budget limit (all models are free cloud)
+budget:
+  max_usd: 999.0  # Effectively unlimited
+
+# DSPy configuration
+dspy:
+  max_retries: 3
+  cache_enabled: true
+
+# Logging
+logging:
+  level: INFO
+  file: logs/vision-critic-run.log

@@ -41,3 +41,22 @@ class ResponseFormatter(Protocol):
     def __call__(self, task: str, summary: str) -> object:
         """Format the final answer for the user."""
         ...
+
+
+@runtime_checkable
+class VisualizationCritic(Protocol):
+    """Protocol for visualization quality validation (e.g., Critic)."""
+    def __call__(
+        self,
+        task: str,
+        code: str,
+        image_path: str,
+        execution_output: str = "",
+        previous_feedback: str = ""
+    ) -> object:
+        """Validate visualization quality and provide feedback.
+
+        Returns:
+            Prediction with is_valid (bool) and feedback (str)
+        """
+        ...

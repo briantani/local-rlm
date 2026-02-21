@@ -78,6 +78,7 @@ class ModulesConfig:
     coder: ModelConfig | None = None
     responder: ModelConfig | None = None
     delegator: ModelConfig | None = None
+    critic: ModelConfig | None = None  # Vision-capable model for visualization refinement
 
 
 @dataclass
@@ -269,7 +270,7 @@ class ConfigLoader:
         """Parse per-module configuration."""
         modules = ModulesConfig()
 
-        for role in ["architect", "coder", "responder", "delegator"]:
+        for role in ["architect", "coder", "responder", "delegator", "critic"]:
             if role in raw:
                 model_config = self._parse_model_config(raw[role])
                 setattr(modules, role, model_config)

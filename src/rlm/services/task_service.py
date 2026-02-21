@@ -16,13 +16,14 @@ from typing import Callable
 
 import dspy
 
-from src.config import get_lm_for_role
+from src.config import get_lm_for_role, model_supports_vision
 from src.core.agent import RLMAgent
 from src.core.api_key_manager import ApiKeyManager
 from src.core.budget import BudgetManager
 from src.core.config_loader import ProfileConfig
 from src.core.repl_state_manager import ReplStateManager
 from src.core.run_context import RunContext
+from src.modules.critic import Critic
 from src.rlm.services.config_service import ConfigService
 from src.rlm.services.session_service import Session
 
@@ -161,7 +162,33 @@ class TaskService:
             logger.info(f"Root model: {config.root.provider}/{config.root.model}")
             logger.info(f"Budget limit: ${config.budget.max_usd:.2f}")
 
-            # Create agent with run context
+            # Create optional critic module if configured
+            critic = None
+            if config.modules.critic:
+                critic_config = config.modules.critic
+                logger.info(f"Critic enabled: {critic_config.provider}/{critic_config.model}")
+
+                # Check if model supports vision
+                if model_supports_vision(critic_config.provider, critic_config.model):
+                    try:
+                        # Configure critic LM
+                        critic_lm = get_lm_for_role("critic", config, budget_manager=budget_manager)
+
+                        # Create critic module with the configured LM
+                        with dspy.context(lm=critic_lm):
+                            critic = Critic()
+
+                        logger.info("✓ Critic initialized with vision capability")
+                    except Exception as e:
+                        logger.warning(f"Failed to initialize critic: {e}. Continuing without critic.")
+                        critic = None
+                else:
+                    logger.warning(
+                        f"Critic model {critic_config.model} does not support vision. "
+                        "Critic disabled. Use qwen3-vl, llava, gemini-2.5-flash, or gpt-4o."
+                    )
+
+            # Create agent with run context and optional critic
             agent = RLMAgent(
                 max_steps=config.root.max_steps,
                 max_depth=config.root.max_depth,
@@ -170,6 +197,7 @@ class TaskService:
                 budget_manager=budget_manager,
                 run_context=run_context,
                 root_lm=lm,
+                critic=critic,  # Pass critic (may be None)
             )
 
             # Track execution history for callbacks

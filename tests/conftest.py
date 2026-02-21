@@ -154,6 +154,41 @@ class MockCoder:
         return MockPrediction(python_code=self.code)
 
 
+class MockCritic:
+    """Mock critic for testing visualization refinement.
+
+    Allows testing of the 3-round refinement loop without calling real LLMs.
+    """
+    def __init__(self, is_valid: bool = True, feedback: str = "Looks good!", confidence: float = 0.9):
+        self.is_valid = is_valid
+        self.feedback = feedback
+        self.confidence = confidence
+        self.call_count = 0
+        self.calls = []  # Track all calls for assertions
+
+    def __call__(
+        self,
+        task: str,
+        code: str,
+        image_path: str,
+        execution_output: str = "",
+        previous_feedback: str = ""
+    ) -> dict[str, str | float]:
+        self.call_count += 1
+        self.calls.append({
+            "task": task,
+            "code": code,
+            "image_path": image_path,
+            "execution_output": execution_output,
+            "previous_feedback": previous_feedback
+        })
+        return MockPrediction(
+            is_valid=self.is_valid,
+            feedback=self.feedback,
+            confidence=self.confidence
+        )
+
+
 class MockResponder:
     """Mock Responder that returns a predetermined response."""
 

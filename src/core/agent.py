@@ -17,7 +17,7 @@ from src.modules.responder import Responder
 from src.core.explorer import scan_directory
 
 # Import extracted modules
-from src.core.agent_protocols import CodeExecutor, TaskRouter, CodeGenerator
+from src.core.agent_protocols import CodeExecutor, TaskRouter, CodeGenerator, VisualizationCritic
 from src.core.agent_context import AgentContext
 from src.core.agent_artifacts import AgentArtifacts
 from src.core.agent_fallbacks import AgentFallbacks
@@ -53,6 +53,7 @@ class RLMAgent:
         architect: TaskRouter | None = None,
         coder: CodeGenerator | None = None,
         responder: object | None = None,
+        critic: VisualizationCritic | None = None,  # Optional vision-capable critic
     ):
         self.config = config
         self.is_delegate = is_delegate
@@ -87,6 +88,7 @@ class RLMAgent:
         self.architect = architect if architect else Architect()
         self.coder = coder if coder else Coder()
         self.responder = responder if responder else Responder(run_context=run_context)
+        self.critic = critic  # Optional - may be None
 
         # LM to be injected into worker threads via dspy.context
         self._thread_lm = root_lm
@@ -356,6 +358,20 @@ class RLMAgent:
                     log_msg = f"{indent}Execution Output (truncated): {output[:100]}..." if len(output) > 100 else f"{indent}Execution Output: {output}"
                     logger.info(log_msg)
 
+                    # NEW: Critic refinement loop for visualizations
+                    if self._should_refine_visualization(output, code):
+                        logger.info(f"{indent}Visualization detected. Running critic refinement...")
+                        code, output = self._refine_visualization_loop(
+                            task=task,
+                            initial_code=code,
+                            initial_output=output,
+                            base_context=coder_context,
+                            indent=indent
+                        )
+                        # Update history with final refined version
+                        self._add_history(f"Refined Code (final):\n{code}", output)
+                        self.repl.add_history_entry(code, output, step + 1)
+
                     # Check for paper-style FINAL() termination
                     if hasattr(self.repl, 'check_for_final'):
                         final_answer = self.repl.check_for_final(output)
@@ -425,3 +441,130 @@ class RLMAgent:
                 return f"Agent confused: Unknown action {action}"
 
         return "Max steps reached without definitive answer."
+
+    def _should_refine_visualization(self, output: str, code: str) -> bool:
+        """Check if code execution created a visualization that needs refinement.
+
+        Triggers refinement if BOTH:
+        1. Code contains visualization keywords (plt.savefig, seaborn, etc.)
+        2. Image artifacts were actually created
+
+        This catches both successful plots and failed attempts.
+        """
+        if not self.critic:
+            return False
+
+        # Check if code contains visualization keywords
+        viz_keywords = ["plt.savefig", "plt.show", "seaborn", "sns.", ".plot(", "plt.figure"]
+        has_viz_code = any(kw in code for kw in viz_keywords)
+
+        # Check if artifacts were created
+        if self.run_context:
+            images = self.run_context.list_images()
+            has_viz_artifact = len(images) > 0
+        else:
+            has_viz_artifact = False
+
+        return has_viz_code and has_viz_artifact
+
+    def _get_latest_visualization(self) -> Path | None:
+        """Get path to most recently created visualization.
+
+        Returns:
+            Path to the latest image artifact, or None if no images exist
+        """
+        if not self.run_context:
+            return None
+
+        images = self.run_context.list_images()
+        if not images:
+            return None
+
+        # Return most recent (last in list)
+        latest = images[-1]
+        return self.run_context.artifacts_dir / latest["filename"]
+
+    def _refine_visualization_loop(
+        self,
+        task: str,
+        initial_code: str,
+        initial_output: str,
+        base_context: str,
+        indent: str
+    ) -> tuple[str, str]:
+        """Run up to 3 rounds of refinement with critic feedback.
+
+        Uses cumulative feedback where each round builds on previous critiques.
+        Follows Paperbanana's three-round refinement pattern.
+
+        Args:
+            task: Original user task
+            initial_code: Initial code that generated the visualization
+            initial_output: Initial execution output
+            base_context: Base context for coder (metadata + last output)
+            indent: Logging indentation string
+
+        Returns:
+            Tuple of (final_code, final_output)
+        """
+        MAX_ROUNDS = 3
+        code = initial_code
+        output = initial_output
+        cumulative_feedback = ""
+
+        for round_num in range(1, MAX_ROUNDS + 1):
+            # Find latest image artifact
+            image_path = self._get_latest_visualization()
+            if not image_path:
+                logger.warning(f"{indent}No visualization found for critic validation")
+                break
+
+            # Run critic
+            try:
+                critique = self.critic(
+                    task=task,
+                    code=code,
+                    image_path=str(image_path),
+                    execution_output=output,
+                    previous_feedback=cumulative_feedback
+                )
+            except Exception as e:
+                logger.error(f"{indent}Critic failed: {e}")
+                break
+
+            if critique.is_valid:
+                logger.info(f"{indent}✓ Visualization validated on round {round_num}")
+                logger.info(f"{indent}  Confidence: {critique.confidence:.2f}")
+                if critique.feedback:
+                    logger.info(f"{indent}  Final feedback: {critique.feedback[:200]}")
+                break
+
+            # Accumulate feedback
+            cumulative_feedback += f"\n\n=== Round {round_num} Critique ===\n{critique.feedback}"
+            logger.info(f"{indent}↻ Refining visualization (round {round_num}/{MAX_ROUNDS})")
+            logger.info(f"{indent}  Critique: {critique.feedback[:300]}{'...' if len(critique.feedback) > 300 else ''}")
+            logger.info(f"{indent}  Confidence: {critique.confidence:.2f}")
+
+            # Don't refine on the last round - accept what we have
+            if round_num >= MAX_ROUNDS:
+                logger.info(f"{indent}✓ Refinement complete ({MAX_ROUNDS} rounds)")
+                break
+
+            # Regenerate with enhanced context
+            enhanced_context = f"{base_context}\n\n🎨 VISUALIZATION CRITIQUE:{cumulative_feedback}"
+
+            try:
+                code_pred = self.coder(task=task, context_summary=enhanced_context)
+                code = code_pred.python_code
+                logger.debug(f"{indent}Refined Code (round {round_num}):\n{code}")
+                output = self.repl.execute(code)
+                self._add_history(f"Refined Code (round {round_num}):\n{code}", output)
+                self.repl.add_history_entry(code, output, f"refine_{round_num}")
+
+                # Scan for new artifacts after refinement
+                self._scan_and_register_artifacts()
+            except Exception as e:
+                logger.error(f"{indent}Refinement failed: {e}")
+                break
+
+        return code, output

@@ -11,6 +11,43 @@ from src.core.prompts import build_coder_system_prompt
 load_dotenv()
 
 
+def model_supports_vision(provider: str, model: str) -> bool:
+    """Check if a model supports vision/image inputs.
+
+    Args:
+        provider: Provider name (gemini, openai, ollama)
+        model: Model name
+
+    Returns:
+        True if the model has vision capabilities
+    """
+    vision_models = {
+        "gemini": [
+            "gemini-2.5-flash", "gemini-2.5-pro",
+            "gemini-1.5-flash", "gemini-1.5-pro",
+            "gemini-pro-vision", "gemini-flash"
+        ],
+        "openai": [
+            "gpt-4o", "gpt-4o-mini",
+            "gpt-4-turbo", "gpt-4-vision-preview",
+            "gpt-4-vision"
+        ],
+        "ollama": [
+            "qwen3-vl", "qwen-vl",
+            "llava", "bakllava",
+            "minicpm-v", "pixtral"
+        ],
+    }
+
+    model_lower = model.lower()
+    provider_lower = provider.lower()
+
+    for key in vision_models.get(provider_lower, []):
+        if key in model_lower:
+            return True
+    return False
+
+
 def get_lm_for_role(
     role: str,
     config: ProfileConfig,
@@ -45,6 +82,9 @@ def get_lm_for_role(
         model_config = config.root.to_model_config()
     elif role == "delegate":
         model_config = config.delegate.to_model_config()
+    elif role == "critic":
+        # Critic uses module override or falls back to root
+        model_config = get_model_config_for_role(role, config, is_delegate)
     else:
         model_config = get_model_config_for_role(role, config, is_delegate)
 
