@@ -195,9 +195,9 @@ class RLMAgent:
         """
         return self._context.format_context_metadata(self.repl)
 
-    def get_last_output_preview(self) -> str:
+    def get_last_output_preview(self, max_chars: int = 500) -> str:
         """Get a preview of the last output for decision making."""
-        return self._context.get_last_output_preview(self.repl)
+        return self._context.get_last_output_preview(self.repl, max_chars=max_chars)
 
     @property
     def history(self) -> list[tuple[str, str]]:
@@ -282,56 +282,55 @@ class RLMAgent:
 
             # 2. Execute Action
             if action == "ANSWER":
-                # For Responder, we need to build context from REPL history
-                # But use chunked summarization if it's too large
-                full_context = self.format_context()
+                # For Responder, pass the last output as findings (concrete data for the report).
+                # Don't pass full context to avoid redundant narration of the process.
+                findings = self.get_last_output_preview(max_chars=2000)
 
-                if self.context_summarizer.should_chunk(full_context):
-                    logger.info(f"{indent}Context too large ({len(full_context)} chars). Using RAG-like summarization.")
-                    final_answer = self._summarize_with_rag(task, full_context, indent)
-                else:
-                    try:
-                        with ThreadPoolExecutor(max_workers=1) as ex:
-                            future = ex.submit(
-                                self._call_in_context,
-                                self.responder,
-                                query=task,
-                                context=full_context,
-                                artifacts_info=artifacts_info,
-                            )
+                try:
+                    with ThreadPoolExecutor(max_workers=1) as ex:
+                        future = ex.submit(
+                            self._call_in_context,
+                            self.responder,
+                            query=task,
+                            findings=findings,
+                            artifacts_info=artifacts_info,
+                        )
+                        try:
                             # Increased timeout for local models
                             response = future.result(timeout=120)
                             final_answer = response.response
-                    except FuturesTimeoutError:
-                        future.cancel()
-                        logger.error(f"{indent}Responder call timed out")
-                        final_answer = self._generate_fallback_answer(task)
+                        except FuturesTimeoutError:
+                            future.cancel()
+                            raise TimeoutError("Responder call timed out")
+                except TimeoutError:
+                    logger.error(f"{indent}Responder call timed out")
+                    final_answer = self._generate_fallback_answer(task)
+                except Exception as e:
+                    logger.error(f"{indent}Responder error: {e}")
+                    final_answer = self._generate_fallback_answer(task)
+
+                # Handle None response (can happen with model issues)
+                if final_answer is None:
+                    logger.warning(f"{indent}Responder returned None. Using fallback.")
+                    final_answer = self._generate_fallback_answer(task)
+
+                logger.info(f"{indent}Final Answer: {final_answer[:200]}..." if len(str(final_answer)) > 200 else f"{indent}Final Answer: {final_answer}")
+
+                # Add final answer to report and perform final assembly to ensure
+                # all artifacts are referenced and summarized.
+                if self.run_context:
+                    try:
+                        self.run_context.add_to_report(str(final_answer))
+                        assembly = self.run_context.finalize_report()
+                        if assembly.get("added"):
+                            logger.warning(f"{indent}Final assembly added missing artifacts: {assembly.get('added')}")
+                        # Save finalized report
+                        report_path = self.run_context.save_report()
+                        logger.info(f"{indent}Saved final report to {report_path}")
                     except Exception as e:
-                        logger.error(f"{indent}Responder error: {e}")
-                        final_answer = self._generate_fallback_answer(task)
+                        logger.exception(f"{indent}Final assembly failed: {e}")
 
-                    # Handle None response (can happen with context overflow or model issues)
-                    if final_answer is None:
-                        logger.warning(f"{indent}Responder returned None. Using RAG-like summarization.")
-                        final_answer = self._summarize_with_rag(task, full_context, indent)
-
-                    logger.info(f"{indent}Final Answer: {final_answer[:200]}..." if len(str(final_answer)) > 200 else f"{indent}Final Answer: {final_answer}")
-
-                    # Add final answer to report and perform final assembly to ensure
-                    # all artifacts are referenced and summarized.
-                    if self.run_context:
-                        try:
-                            self.run_context.add_to_report(str(final_answer))
-                            assembly = self.run_context.finalize_report()
-                            if assembly.get("added"):
-                                logger.warning(f"{indent}Final assembly added missing artifacts: {assembly.get('added')}")
-                            # Save finalized report
-                            report_path = self.run_context.save_report()
-                            logger.info(f"{indent}Saved final report to {report_path}")
-                        except Exception as e:
-                            logger.exception(f"{indent}Final assembly failed: {e}")
-
-                    return final_answer
+                return final_answer
 
             elif action == "CODE":
                 logger.info(f"{indent}Generating code...")

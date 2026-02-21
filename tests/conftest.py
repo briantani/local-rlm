@@ -196,7 +196,7 @@ class MockResponder:
         self._response = response
         self.call_count = 0
 
-    def __call__(self, query: str, context: str = "", artifacts_info: str = ""):
+    def __call__(self, query: str, findings: str = "", artifacts_info: str = ""):
         self.call_count += 1
         return MockPrediction(response=self._response)
 

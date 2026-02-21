@@ -8,13 +8,20 @@ if TYPE_CHECKING:
 
 class ResponderSignature(dspy.Signature):
     """
-    Generates a natural language response to a user's query based on context.
-    Format your response in Markdown with clear sections, bullet points, and code blocks where appropriate.
+    Generates a concise, non-redundant Markdown response answering the user's query.
+    Use findings (output from code execution) to extract key facts and values.
+    Use artifacts to reference any generated files (images, CSVs, etc).
+    DO NOT:
+    - Narrate HOW the computation was done (e.g., "The script read the CSV...").
+    - Suggest Python code to recreate results that are already shown.
+    - Use template variables (e.g., {{variable}})—fill in actual values from findings.
+    - Output placeholder text; use only concrete data from the findings.
+    Instead, focus on answering the query directly with key insights and data values.
     """
     query = dspy.InputField(desc="The user's query.")
-    context = dspy.InputField(desc="Context, including previous code execution outputs.", default="")
+    findings = dspy.InputField(desc="Key findings and data from code execution (actual values, statistics, summaries).", default="")
     artifacts_info = dspy.InputField(desc="Structured artifact metadata (filenames, sections, descriptions).", default="")
-    response = dspy.OutputField(desc="A well-formatted Markdown response answering the query.")
+    response = dspy.OutputField(desc="A concise Markdown response with concrete values and embedded visualizations. No templates or placeholders.")
 
 
 class Responder(dspy.Module):
@@ -23,8 +30,8 @@ class Responder(dspy.Module):
         self.respond = dspy.ChainOfThought(ResponderSignature)
         self.run_context = run_context
 
-    def forward(self, query: str, context: str = "", artifacts_info: str = "") -> dspy.Prediction:
-        prediction = self.respond(query=query, context=context, artifacts_info=artifacts_info)
+    def forward(self, query: str, findings: str = "", artifacts_info: str = "") -> dspy.Prediction:
+        prediction = self.respond(query=query, findings=findings, artifacts_info=artifacts_info)
 
         # If we have a run context with images, append them to the response
         if self.run_context:

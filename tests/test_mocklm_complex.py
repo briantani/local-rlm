@@ -88,7 +88,7 @@ def test_coder_returns_expected_artifacts_and_code():
 def test_responder_includes_artifacts_info():
     setup_scripted_lm()
     responder = Responder()
-    resp = responder.forward(query="Render final answer", context="", artifacts_info="results.csv: summary section")
+    resp = responder.forward(query="Render final answer", findings="", artifacts_info="results.csv: summary section")
     # Responder.forward should return a Prediction with response text including the artifacts_info
     assert hasattr(resp, "response")
     assert "results.csv" in resp.response

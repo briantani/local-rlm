@@ -12,6 +12,7 @@ This enables the agent to:
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 import dspy
@@ -109,11 +110,11 @@ class LLMQueryFunction:
             return []
 
         logger.info(f"Batch processing {len(chunks)} chunks with {max_workers} workers")
-        
+
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # map preserves order: results[i] corresponds to chunks[i]
             results = list(executor.map(lambda c: self.__call__(query, c), chunks))
-            
+
         return results
 
     @property
