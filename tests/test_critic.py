@@ -70,7 +70,7 @@ class TestCriticModule:
         """Critic should initialize with examples."""
         critic = Critic()
         assert critic.critique is not None
-        assert len(critic.critique.demos) == 3  # We have 3 examples
+        assert len(critic.critique.demos) == 5  # We have 5 examples
 
     def test_critic_signature_fields(self):
         """CriticSignature should have correct input/output fields."""
