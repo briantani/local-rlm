@@ -176,6 +176,29 @@ RLM_RUN_INTEGRATION=1 uv run pytest -q -m integration --durations=20
 └─────────────────────────────────────────────────────────┘
 ```
 
+### Thread-Local LM Configuration (Concurrency)
+
+RLMAgent uses `ThreadPoolExecutor` to manage timeouts on LLM calls while maintaining thread-safe LM contexts:
+
+- **Main thread**: Root agent runs in the primary thread with its configured LM
+- **Worker threads**: Architect, Coder, and Responder calls execute in `ThreadPoolExecutor` threads
+- **Sub-agents**: Delegate agents (via `recursive_llm()`) spawn in threads with their own LM configuration
+- **Context propagation**: Each thread inherits its LM via `dspy.context()`, preventing configuration conflicts
+
+This approach is critical for **Python 3.14t** where the GIL is removed and true parallelism is enabled. The `dspy.context(lm=...)` context manager ensures each thread has isolated LM settings without race conditions.
+
+```python
+# Example: Architect runs in a thread but keeps the configured LM
+with ThreadPoolExecutor(max_workers=1) as ex:
+    future = ex.submit(
+        self._call_in_context,  # Wraps with dspy.context()
+        self.architect,
+        query=task,
+        ...
+    )
+    decision = future.result(timeout=120)
+```
+
 ## Tech Stack
 
 - **Python 3.14.2** (Free-Threaded) - No GIL, true parallelism

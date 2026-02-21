@@ -131,13 +131,20 @@ class RLMAgent:
         """Thread-safe history append for Python 3.14t compatibility."""
         self._context.add_history(action, output)
 
-    def _call_in_context(self, fn, *args, **kwargs):
-        """Call a function inside a thread-local dspy context if an LM was provided.
+    def _call_in_context(self, fn, *args, _lm_override=None, **kwargs):
+        """Call a function inside a thread-local dspy context.
 
-        This ensures worker threads created by ThreadPoolExecutor have the same
+        Uses _lm_override if provided (for delegates), otherwise uses root LM.
+        Ensures worker threads created by ThreadPoolExecutor have the same
         LM configuration as the main thread.
+
+        Args:
+            fn: Function to call
+            *args: Positional arguments for fn
+            _lm_override: Override LM to use (for delegates)
+            **kwargs: Keyword arguments for fn
         """
-        lm = getattr(self, "_thread_lm", None)
+        lm = _lm_override if _lm_override is not None else self._thread_lm
         if lm is not None:
             with dspy.context(lm=lm):
                 return fn(*args, **kwargs)
@@ -215,9 +222,8 @@ class RLMAgent:
             role = "delegate"
             lm = get_lm_for_role(role, self.config, budget_manager=self.budget_manager)
             logger.debug(f"{indent}Configured delegate LM: {self.config.delegate.model}")
-            # Use context manager for thread-local LM settings
-            with dspy.context(lm=lm):
-                return self._run_loop(task, indent)
+            # Use _call_in_context to wrap delegate execution with proper LM context
+            return self._call_in_context(self._run_loop, task, indent, _lm_override=lm)
         else:
             return self._run_loop(task, indent)
 
@@ -345,7 +351,8 @@ class RLMAgent:
                                 task=task,
                                 context_summary=coder_context,
                             )
-                            # Significantly increased timeout for code generation which can be slow locally
+                            # 600s (10 min) timeout for code generation—accounts for slow local models,
+                            # large context processing, and complex task reasoning
                             code_pred = future.result(timeout=600)
                     except FuturesTimeoutError:
                         future.cancel()

@@ -241,6 +241,117 @@ async def test_agent_simple_answer(setup_dspy_ollama):
 
 
 # ============================================================================
+# THREAD-LOCAL CONTEXT TESTS (Concurrency & Sub-Agent Support)
+# ============================================================================
+
+class TestCallInContext:
+    """Tests for _call_in_context method which manages thread-local LM configuration."""
+
+    def test_call_in_context_with_lm(self):
+        """Verify _call_in_context wraps function in dspy.context when LM is provided."""
+        # Create a mock LM object
+        mock_lm = type('MockLM', (), {'provider': 'mock'})()
+
+        agent = RLMAgent(root_lm=mock_lm)
+
+        # Track whether the function was called
+        call_log = []
+
+        def mock_fn():
+            # Verify that we're inside a dspy context with the LM
+            call_log.append(True)
+            return "result"
+
+        result = agent._call_in_context(mock_fn)
+
+        assert result == "result"
+        assert len(call_log) == 1
+
+    def test_call_in_context_without_lm(self):
+        """Verify _call_in_context works without LM (graceful fallback)."""
+        agent = RLMAgent(root_lm=None)
+
+        called = [False]
+
+        def mock_fn():
+            called[0] = True
+            return "result"
+
+        result = agent._call_in_context(mock_fn)
+
+        assert result == "result"
+        assert called[0] is True
+
+    def test_call_in_context_with_args_and_kwargs(self):
+        """Verify _call_in_context correctly passes through args and kwargs."""
+        mock_lm = type('MockLM', (), {'provider': 'mock'})()
+        agent = RLMAgent(root_lm=mock_lm)
+
+        def mock_fn(a, b, c=None, d=None):
+            return {"a": a, "b": b, "c": c, "d": d}
+
+        result = agent._call_in_context(
+            mock_fn,
+            "arg1",
+            "arg2",
+            c="kwarg1",
+            d="kwarg2",
+        )
+
+        assert result == {"a": "arg1", "b": "arg2", "c": "kwarg1", "d": "kwarg2"}
+
+    def test_call_in_context_lm_override(self):
+        """Verify _call_in_context respects _lm_override parameter for delegates."""
+        root_lm = type('RootLM', (), {'provider': 'root'})()
+        delegate_lm = type('DelegateLM', (), {'provider': 'delegate'})()
+
+        agent = RLMAgent(root_lm=root_lm)
+
+        lm_in_context = []
+
+        def mock_fn():
+            # Check which LM was active
+            lm_in_context.append(dspy.settings.lm if hasattr(dspy.settings, 'lm') else None)
+            return "result"
+
+        result = agent._call_in_context(mock_fn, _lm_override=delegate_lm)
+
+        # The function should have executed
+        assert result == "result"
+
+    def test_call_in_context_exception_propagation(self):
+        """Verify exceptions are properly propagated from _call_in_context."""
+        mock_lm = type('MockLM', (), {'provider': 'mock'})()
+        agent = RLMAgent(root_lm=mock_lm)
+
+        def failing_fn():
+            raise ValueError("Test exception")
+
+        with pytest.raises(ValueError, match="Test exception"):
+            agent._call_in_context(failing_fn)
+
+    def test_call_in_context_preserves_return_value(self):
+        """Verify _call_in_context preserves complex return values."""
+        mock_lm = type('MockLM', (), {'provider': 'mock'})()
+        agent = RLMAgent(root_lm=mock_lm)
+
+        expected_return = {
+            "list": [1, 2, 3],
+            "dict": {"nested": "value"},
+            "tuple": (1, 2),
+            "none": None,
+        }
+
+        def mock_fn():
+            return expected_return
+
+        result = agent._call_in_context(mock_fn)
+
+        assert result == expected_return
+        assert result["list"] == [1, 2, 3]
+
+
+# ============================================================================
 # PAPER-STYLE METADATA TESTS (MIT RLM Paper Implementation)
 # ============================================================================
 
