@@ -25,8 +25,9 @@ def main():
         description="Run the RLM Agent on a task using YAML configuration profiles.",
         epilog=(
             "Examples:\n"
-            "  uv run python src/main.py 'Calculate fibonacci(20)' --config configs/paper-gpt5.yaml\n"
-            "  uv run python src/main.py --prompt-file tasks/research.txt --config configs/high-quality.yaml"
+            "  uv run rlm 'Calculate fibonacci(20)' --config configs/paper-gpt5.yaml\n"
+            "  uv run rlm --prompt-file tasks/research.txt --config configs/high-quality.yaml\n"
+            "  uv run rlm 'Analyze sales.csv' --config configs/vision-critic.yaml --context ./data"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter
     )

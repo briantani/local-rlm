@@ -17,7 +17,22 @@ class CoderSignature(dspy.Signature):
     ❌ import pandas -> ✅ pd (already available)
     ❌ df['col'] += 1 -> ✅ df['col'] = df['col'] + 1 (for complex cases)
 
-    VARIABLES: output_dir, input_dir, history, task, context
+    PRE-LOADED VARIABLES:
+    - output_dir: Directory for saving output files (use this!)
+    - input_dir: Directory containing input files from --context (use this!)
+    - history: Execution history from previous steps
+    - task: The original task description
+    - context: Last output from previous steps
+
+    IMPORTANT FOR FILE ACCESS:
+    When reading files from context, ALWAYS use input_dir:
+      ❌ pd.read_csv('sales_data.csv')  # FAILS - file not found
+      ❌ pd.read_csv(f'{__context_dir__}/sales_data.csv')  # RestrictedPython blocks __ names
+      ✅ pd.read_csv(f'{input_dir}/sales_data.csv')  # CORRECT
+
+    When saving files to output, use output_dir:
+      ✅ plt.savefig(f'{output_dir}/chart.png')
+      ✅ df.to_csv(f'{output_dir}/results.csv')
 
     FUNCTIONS:
     - search_web(query) - Search the web
@@ -50,16 +65,23 @@ class Coder(dspy.Module):
                 python_code="user_name = 'Alice'\n# Use f-strings (safe), NOT .format() (blocked)\nmessage = f'Hello, {user_name}! Welcome to RLM.'\nprint(message)"
             ).with_inputs("task", "context_summary"),
             # Basic file operations - NO IMPORTS needed
+            # CRITICAL: Use input_dir (not __context_dir__) to read files!
             dspy.Example(
-                task="Read the CSV file 'data/sales.csv' and show the first 5 rows",
-                context_summary="AVAILABLE FILES: [FILE] data/sales.csv",
-                python_code="df = pd.read_csv('data/sales.csv')\nprint(df.head())"
+                task="Read the CSV file 'sales.csv' and show the first 5 rows",
+                context_summary="AVAILABLE FILES: [FILE] sales_data.csv",
+                python_code="# Use input_dir (no underscores) to read context files\ndf = pd.read_csv(f'{input_dir}/sales_data.csv')\nprint(df.head())"
             ).with_inputs("task", "context_summary"),
             # Chart creation - use output_dir, not __artifacts_dir__
             dspy.Example(
                 task="Create a bar chart of sales data and save it",
                 context_summary="output_dir = 'runs/20260109_123456'",
                 python_code="data = {'Q1': 100, 'Q2': 150, 'Q3': 120, 'Q4': 180}\nplt.figure(figsize=(10, 6))\nplt.bar(data.keys(), data.values())\nplt.title('Quarterly Sales')\nplt.savefig(f'{output_dir}/sales_chart.png')\nplt.close()\nprint(f'Chart saved to {output_dir}/sales_chart.png')"
+            ).with_inputs("task", "context_summary"),
+            # Complete data analysis workflow with context + output
+            dspy.Example(
+                task="Analyze sales data from a CSV file in context folder and create visualizations",
+                context_summary="AVAILABLE FILES: [FILE] sales_data.csv",
+                python_code="# Step 1: Read data from input_dir (where context files are)\ndf = pd.read_csv(f'{input_dir}/sales_data.csv')\nprint(f'Loaded {len(df)} rows')\n\n# Step 2: Basic analysis\nprint(df.describe())\n\n# Step 3: Create visualization and save to output_dir\nplt.figure(figsize=(12, 6))\ndf.plot(kind='bar')\nplt.title('Sales Data')\nplt.tight_layout()\nplt.savefig(f'{output_dir}/sales_plot.png')\nplt.close()\nprint(f'Saved plot to {output_dir}/sales_plot.png')"
             ).with_inputs("task", "context_summary"),
             # DataFrame operations - safe assignment patterns
             dspy.Example(

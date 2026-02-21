@@ -24,6 +24,9 @@ dependencies = [
     "rich>=13.9.4",
 ]
 
+[project.scripts]
+rlm = "src.main:main"
+
 # Libraries available in the REPL sandbox for code execution
 # These are pre-loaded and accessible without imports in generated code
 [dependency-groups]
@@ -61,6 +64,7 @@ dev = [
     "pytest-playwright>=0.7.2",
     "pytest-timeout>=2.4.0",
     "weasyprint>=67.0",
+    "mypy>=1.8.0",
 ]
 
 [tool.pytest.ini_options]
@@ -75,4 +79,14 @@ filterwarnings = [
     "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning",
     "ignore::pydantic.warnings.PydanticDeprecatedSince20",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
 

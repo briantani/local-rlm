@@ -38,7 +38,7 @@ uv sync
 ollama pull qwen2.5-coder:7b
 
 # Run a task
-uv run python src/main.py "Calculate fibonacci(100)" --config configs/local-only.yaml
+uv run rlm "Calculate fibonacci(100)" --config configs/local-only.yaml
 ```
 
 ### Run (Cloud - Gemini)
@@ -48,7 +48,7 @@ uv run python src/main.py "Calculate fibonacci(100)" --config configs/local-only
 echo "GEMINI_API_KEY=your-key" > .env
 
 # Run a task
-uv run python src/main.py "Summarize quantum computing" --config configs/cost-effective.yaml
+uv run rlm "Summarize research.pdf" --config configs/cost-effective.yaml --context ./documents
 ```
 
 ## Configuration Profiles
@@ -87,23 +87,25 @@ See `docs/CHANGES.md` for detailed examples and guidance on using these features
 ## CLI Options
 
 ```bash
-uv run python src/main.py "<task>" --config configs/<profile>.yaml [options]
+uv run rlm "<task>" --config configs/<profile>.yaml [options]
 
 Options:
   --context <dir>       Include files from directory as context
   --prompt-file <file>  Read task from file instead of command line
   --verbose             Show detailed execution logs
-  --dry-run             Validate config without executing
 ```
 
 ### Examples
 
 ```bash
 # Analyze files in a directory
-uv run python src/main.py "Summarize the CSV files" --config configs/hybrid.yaml --context ./data
+uv run rlm "Summarize the CSV files" --config configs/hybrid.yaml --context ./data
 
-# Complex research task
-uv run python src/main.py --prompt-file tasks/research.txt --config configs/high-quality.yaml
+# Complex research task from file
+uv run rlm --prompt-file tasks/research.txt --config configs/high-quality.yaml
+
+# Data analysis with vision critic
+uv run rlm "Analyze sales.csv and create visualizations" --config configs/vision-critic.yaml --context ./data
 ```
 
 ## Web Interface
