@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from src.core.logger import logger
 import logging
 from src.rlm.services import ConfigService, SessionService, TaskService
+from src.core.dspy_config import configure_dspy
 
 # Load environment variables (for API keys)
 load_dotenv()
@@ -86,6 +87,10 @@ def main():
         logger.debug("Verbose logging enabled")
     else:
         logger.set_level(logging.INFO)
+
+    # Initialize DSPy caching (Phase 3 optimization)
+    # This ensures a local .dspy_cache directory is used
+    configure_dspy(cache_enabled=True)
 
     # Initialize services (Phase 12 pattern)
     config_service = ConfigService()

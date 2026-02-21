@@ -17,6 +17,7 @@ from src.web.dependencies import get_services
 from src.web.routes import configs, sessions, tasks
 from src.web.websocket import stream
 from src.web.database import init_db
+from src.core.dspy_config import configure_dspy
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,9 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler for startup/shutdown."""
     # Startup
     logger.info("Starting RLM Web Application...")
+
+    # Initialize DSPy caching (Phase 3 optimization)
+    configure_dspy(cache_enabled=True)
 
     # Initialize database
     await init_db()
