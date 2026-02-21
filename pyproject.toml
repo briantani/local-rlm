@@ -20,6 +20,8 @@ dependencies = [
     "aiosqlite>=0.22.1",
     # Web Search
     "ddgs>=9.10.0",
+    # CLI
+    "rich>=13.9.4",
 ]
 
 # Libraries available in the REPL sandbox for code execution

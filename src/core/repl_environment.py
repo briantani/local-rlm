@@ -80,6 +80,7 @@ class EnvironmentSetup:
         # Create llm_query for recursive sub-LM calls
         llm_query_fn = create_llm_query(budget_manager=budget_manager)
         globals_dict["llm_query"] = llm_query_fn
+        globals_dict["batch_llm_query"] = llm_query_fn.batch
 
         # Create recursive_llm for spawning sub-agents
         recursive_llm_fn = _create_recursive_llm(

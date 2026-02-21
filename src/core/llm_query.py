@@ -91,6 +91,31 @@ class LLMQueryFunction:
             logger.error(f"llm_query failed: {e}")
             return f"[Error in llm_query: {e}]"
 
+    def batch(self, query: str, chunks: list[str], max_workers: int = 5) -> list[str]:
+        """
+        Process multiple context chunks in parallel.
+
+        Guarantees that the output list order matches the input list order.
+
+        Args:
+            query: The question to answer for each chunk
+            chunks: List of text chunks to process
+            max_workers: Number of parallel threads
+
+        Returns:
+            List of answers corresponding to the chunks
+        """
+        if not chunks:
+            return []
+
+        logger.info(f"Batch processing {len(chunks)} chunks with {max_workers} workers")
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # map preserves order: results[i] corresponds to chunks[i]
+            results = list(executor.map(lambda c: self.__call__(query, c), chunks))
+            
+        return results
+
     @property
     def call_count(self) -> int:
         """Get the number of llm_query calls made."""

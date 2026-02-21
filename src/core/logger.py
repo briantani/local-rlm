@@ -4,6 +4,26 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# Try to import rich for better CLI experience
+try:
+    from rich.logging import RichHandler
+    from rich.console import Console
+    from rich.theme import Theme
+    
+    # Custom theme for RLM
+    rlm_theme = Theme({
+        "info": "cyan",
+        "warning": "yellow",
+        "error": "red bold",
+        "success": "green",
+    })
+    
+    console = Console(theme=rlm_theme)
+    HAS_RICH = True
+except ImportError:
+    console = None
+    HAS_RICH = False
+
 
 class LazyLogger:
     """
@@ -45,9 +65,21 @@ class LazyLogger:
         )
 
         # Console Handler
-        console_handler = logging.StreamHandler(sys.stdout)
+        if HAS_RICH:
+            # Use RichHandler for beautiful output
+            # RichHandler handles timestamp and level formatting automatically
+            console_handler = RichHandler(
+                console=console,
+                rich_tracebacks=True,
+                show_time=True,
+                show_path=False
+            )
+        else:
+            # Fallback to standard StreamHandler
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setFormatter(formatter)
+        
         console_handler.setLevel(self._log_level)
-        console_handler.setFormatter(formatter)
         self._logger.addHandler(console_handler)
 
         # File Handler (skip during testing)
@@ -61,15 +93,22 @@ class LazyLogger:
                     log_dir = Path("logs")
             except Exception:
                 log_dir = Path("logs")
+            
+            # Create logs directory if it doesn't exist
+            if not log_dir.exists():
+                try:
+                    log_dir.mkdir(parents=True, exist_ok=True)
+                except Exception:
+                    pass  # Fail silently if we can't create directory
 
-            log_dir.mkdir(exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            log_file = log_dir / f"rlm_run_{timestamp}.log"
+            if log_dir.exists():
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                log_file = log_dir / f"rlm_run_{timestamp}.log"
 
-            file_handler = logging.FileHandler(log_file)
-            file_handler.setLevel(self._log_level)
-            file_handler.setFormatter(formatter)
-            self._logger.addHandler(file_handler)
+                file_handler = logging.FileHandler(log_file)
+                file_handler.setLevel(self._log_level)
+                file_handler.setFormatter(formatter)
+                self._logger.addHandler(file_handler)
 
         self._initialized = True
         return self._logger
@@ -88,6 +127,9 @@ class LazyLogger:
 
     def critical(self, msg: str, *args, **kwargs):
         self._get_logger().critical(msg, *args, **kwargs)
+    
+    def exception(self, msg: str, *args, **kwargs):
+        self._get_logger().exception(msg, *args, **kwargs)
 
 
 # Create a lazy logger instance for easy import

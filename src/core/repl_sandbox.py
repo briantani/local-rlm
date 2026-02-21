@@ -114,6 +114,7 @@ class SandboxGuards:
         safe_builtins = {
             # Types
             "len": len,
+            "type": type,
             "str": str,
             "int": int,
             "float": float,
