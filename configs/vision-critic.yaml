@@ -7,15 +7,15 @@ description: |
   Enables automatic visualization refinement with a vision-capable critic.
   Validates charts, plots, and images for quality and clarity through 3 rounds of refinement.
 
-  Uses free Ollama Cloud vision model (qwen3-vl:235b-instruct-cloud) for zero-cost refinement.
+  Uses Ollama Cloud vision model (qwen3.5:397b-cloud) for quality refinement.
   Perfect for data analysis tasks that generate charts and reports.
 
 # Root agent configuration
 root:
   provider: ollama
-  model: gpt-oss:120b-cloud
+  model: qwen3.5:cloud
   max_steps: 20  # More steps to accommodate refinement loops
-  max_depth: 3
+  max_depth: 5
   pricing:
     input_per_1m: 0.0
     output_per_1m: 0.0
@@ -23,7 +23,7 @@ root:
 # Sub-agent configuration (spawned by recursive_llm() in generated code)
 delegate:
   provider: ollama
-  model: qwen3-coder-next:cloud
+  model: qwen3.5:cloud
   max_steps: 12
   max_depth: 1
   pricing:
@@ -35,7 +35,7 @@ modules:
   # Architect uses reasoning model
   architect:
     provider: ollama
-    model: gpt-oss:120b-cloud
+    model: qwen3.5:cloud
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
@@ -43,7 +43,7 @@ modules:
   # Coder uses specialized coding model
   coder:
     provider: ollama
-    model: qwen3-coder-next:cloud
+    model: qwen3.5:cloud
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
@@ -51,7 +51,7 @@ modules:
   # Responder generates final reports
   responder:
     provider: ollama
-    model: gpt-oss:120b-cloud
+    model: qwen3.5:cloud
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
@@ -59,10 +59,10 @@ modules:
   # NEW: Critic validates visualizations (OPTIONAL)
   critic:
     provider: ollama
-    model: qwen3-vl:235b-instruct-cloud  # Vision-capable, free, cloud-hosted
+    model: qwen3.5:397b-cloud  # Vision-capable, cloud-hosted
     pricing:
-      input_per_1m: 0.0   # Free!
-      output_per_1m: 0.0  # Free!
+      input_per_1m: 0.0
+      output_per_1m: 0.0
 
 # Global budget limit (all models are free cloud)
 budget:

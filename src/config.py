@@ -34,6 +34,7 @@ def model_supports_vision(provider: str, model: str) -> bool:
         ],
         "ollama": [
             "qwen3-vl", "qwen-vl",
+            "qwen3.5-vl", "qwen3.5:397b-cloud",
             "llava", "bakllava",
             "minicpm-v", "pixtral"
         ],

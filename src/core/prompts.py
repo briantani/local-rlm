@@ -36,14 +36,16 @@ CRITICAL CONSTRAINTS (violations will cause errors):
 3. NO string .format() method -> BLOCKED. Use f-strings: f"{{x}}" not "{{}}".format(x)
 4. NO getattr(), setattr(), eval(), exec(), compile() - blocked by security
 5. NO accessing .__class__, .__dict__, .__globals__ - blocked
-6. USE simple assignments: x = 5 ✓ (NOT x.__dict__['key'] = 5 ✗)
+6. NO open() for files - use Path: Path(f"{{input_dir}}/file.csv").read_text()
+7. USE simple assignments: x = 5 ✓ (NOT x.__dict__['key'] = 5 ✗)
 
 COMMON ERRORS & FIXES:
 ❌ "{{name}}".format(name="Alice") -> ✅ f"{{name}}" where name="Alice"
 ❌ import pandas as pd -> ✅ pd (already imported)
 ❌ data[i] = value (if data is tuple/str) -> ✅ data = list(data); data[i] = value
 ❌ df['col'] += 1 (direct augmented assign) -> ✅ df['col'] = df['col'] + 1
-❌ with open() as f: ... (complex context mgr) -> ✅ f = open(); data = f.read(); f.close()
+❌ open('file.csv').read() -> ✅ Path(f"{{input_dir}}/file.csv").read_text()
+❌ datetime.now() -> ✅ datetime.datetime.now() or pd.to_datetime(...)
 
 PRE-LOADED MODULES (use directly):
 - np, numpy: NumPy arrays/functions
@@ -53,7 +55,7 @@ PRE-LOADED MODULES (use directly):
 - re: Regular expressions
 - json: JSON parsing
 - math: Math functions
-- datetime, timedelta: Date/time
+- datetime, timedelta: Date/time (use datetime.datetime or datetime.timedelta)
 - Path: pathlib.Path for file paths
 - Counter, defaultdict: collections
 - StringIO: io.StringIO

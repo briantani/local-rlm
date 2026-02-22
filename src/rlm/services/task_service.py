@@ -185,7 +185,7 @@ class TaskService:
                 else:
                     logger.warning(
                         f"Critic model {critic_config.model} does not support vision. "
-                        "Critic disabled. Use qwen3-vl, llava, gemini-2.5-flash, or gpt-4o."
+                        "Critic disabled. Use qwen3.5:397b-cloud, qwen3-vl, llava, gemini-2.5-flash, or gpt-4o."
                     )
 
             # Create agent with run context and optional critic

@@ -10,12 +10,22 @@ class CoderSignature(dspy.Signature):
     - NO .format() string method - use f-strings: f"{x}" not "{}".format(x)
     - NO underscore variables (__name__, __file__, __dict__)
     - NO getattr, setattr, eval, exec
+    - NO open() for files (RestrictedPython). Use Path.read_text/write_text.
     - Use simple assignments: x = 5 (NOT complex attribute access)
+    - NO line continuations with backslash inside f-strings or long expressions
+      (Use parentheses instead: df['col'] = (condition1 and condition2))
 
     COMMON ERROR FIXES:
     ❌ "{}".format(x) -> ✅ f"{x}"
     ❌ import pandas -> ✅ pd (already available)
     ❌ df['col'] += 1 -> ✅ df['col'] = df['col'] + 1 (for complex cases)
+    ❌ open('file.csv').read() -> ✅ Path(f"{input_dir}/file.csv").read_text()
+    ❌ datetime.now() -> ✅ datetime.datetime.now() or pd.to_datetime(...)
+    ❌ region_sales = \\
+           df.groupby('Region')['Sales'].sum() -> ✅ use parentheses for line breaks
+    ✅ region_sales = (
+        df.groupby('Region')['Sales'].sum()
+       )
 
     PRE-LOADED VARIABLES:
     - output_dir: Directory for saving output files (use this!)
@@ -81,7 +91,7 @@ class Coder(dspy.Module):
             dspy.Example(
                 task="Analyze sales data from a CSV file in context folder and create visualizations",
                 context_summary="AVAILABLE FILES: [FILE] sales_data.csv",
-                python_code="# Step 1: Read data from input_dir (where context files are)\ndf = pd.read_csv(f'{input_dir}/sales_data.csv')\nprint(f'Loaded {len(df)} rows')\n\n# Step 2: Basic analysis\nprint(df.describe())\n\n# Step 3: Create visualization and save to output_dir\nplt.figure(figsize=(12, 6))\ndf.plot(kind='bar')\nplt.title('Sales Data')\nplt.tight_layout()\nplt.savefig(f'{output_dir}/sales_plot.png')\nplt.close()\nprint(f'Saved plot to {output_dir}/sales_plot.png')"
+                python_code="# Step 1: Read data from input_dir (where context files are)\ndf = pd.read_csv(f'{input_dir}/sales_data.csv')\nprint(f'Loaded {len(df)} rows')\nprint(f'Columns: {list(df.columns)}')\n\n# Step 2: Find sales column (may have different names)\nsales_col = None\nfor col in df.columns:\n    if 'sales' in col.lower() or 'revenue' in col.lower() or 'amount' in col.lower():\n        sales_col = col\n        break\nif sales_col:\n    print(f'Found sales column: {sales_col}')\n    print(f'Total: {df[sales_col].sum()}')\nelse:\n    print('No sales column found. Available columns: ' + ', '.join(df.columns))\n\n# Step 3: Create visualization and save to output_dir\nplt.figure(figsize=(12, 6))\ndf.plot(kind='bar')\nplt.title('Sales Data')\nplt.tight_layout()\nplt.savefig(f'{output_dir}/sales_plot.png')\nplt.close()\nprint(f'Saved plot to {output_dir}/sales_plot.png')"
             ).with_inputs("task", "context_summary"),
             # DataFrame operations - safe assignment patterns
             dspy.Example(
@@ -116,12 +126,21 @@ class Coder(dspy.Module):
                 context_summary="Execution History: 5 steps, 45000 chars. Use history for full content.",
                 python_code="# Build answer from execution history\nrelevant_data = []\nfor entry in history:\n    if entry['output_length'] > 100:  # Skip empty/error outputs\n        relevant_data.append(f\"Step {entry['step']}:\\n{entry['output'][:5000]}\")\n\n# Use llm_query to synthesize answer\ncontext = '\\n\\n---\\n\\n'.join(relevant_data)\nanswer = llm_query(f'Based on this research, answer: {task}', context[:50000])\nprint(answer)"
             ).with_inputs("task", "context_summary"),
+            # BONUS: Comprehensive sales analysis with robust column detection
+            dspy.Example(
+                task="Create a thorough report with sales information",
+                context_summary="AVAILABLE FILES: [FILE] sales_data.csv",
+                python_code="import pandas as pd\nimport matplotlib.pyplot as plt\nfrom pathlib import Path\n\n# Load data\ndf = pd.read_csv(f'{input_dir}/sales_data.csv')\nprint(f'=== Data Loaded ===')\nprint(f'Rows: {len(df)}, Columns: {len(df.columns)}')\nprint(f'Column names: {list(df.columns)}')\n\n# Detect sales column - try common patterns (with/without underscore)\nsales_col = None\nfor candidate in ['Sales_Amount', 'sales_amount', 'Sales', 'sales', 'Revenue', 'revenue', 'Amount', 'amount']:\n    if candidate in df.columns:\n        sales_col = candidate\n        break\n\nif not sales_col:\n    # Fallback: any column with 'sales' or 'revenue'\n    for col in df.columns:\n        col_lower = col.lower()\n        if 'sale' in col_lower or 'revenue' in col_lower or 'amount' in col_lower:\n            sales_col = col\n            break\n\nif sales_col:\n    print(f'Sales column: {sales_col}')\n    print(f'Total Sales: ${df[sales_col].sum():,.2f}')\n    \n    # Create summary statistics\n    print(f'\\n=== Sales Summary ===')\n    print(f'Average: ${df[sales_col].mean():,.2f}')\n    print(f'Min: ${df[sales_col].min():,.2f}')\n    print(f'Max: ${df[sales_col].max():,.2f}')\n    \n    # Save results\n    summary = f'''Sales Report\n=============\nTotal Sales: ${df[sales_col].sum():,.2f}\nAverage Sale: ${df[sales_col].mean():,.2f}\nNumber of Records: {len(df)}\n'''\n    Path(f'{output_dir}/sales_summary.txt').write_text(summary)\n    print(f'\\nReport saved to {output_dir}/sales_summary.txt')\nelse:\n    print('ERROR: Could not find sales column. Available columns:')\n    print(', '.join(df.columns))"
+            ).with_inputs("task", "context_summary"),
         ]
 
     def forward(self, task: str, context_summary: str = "") -> dspy.Prediction:
         # Generate code
         prediction = self.generate_code(task=task, context_summary=context_summary)
         code = prediction.python_code
+
+        if not isinstance(code, str):
+            raise ValueError("Generated code is empty or not a string.")
 
         # Clean up markdown code blocks if present (common LLM behavior)
         if code.startswith("```python"):

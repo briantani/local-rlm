@@ -232,6 +232,9 @@ class RLMAgent:
         # Set the task in REPL so code can access it via __task__
         self.repl.set_task(task)
 
+        consecutive_code_errors = 0  # Track failed CODE attempts to avoid infinite loops
+        MAX_CONSECUTIVE_ERRORS = 2   # Force ANSWER if > 2 consecutive CODE failures
+
         for step in range(self.max_steps):
             logger.info(f"{indent}--- Step {step + 1} ---")
 
@@ -256,29 +259,34 @@ class RLMAgent:
                     parts.append(f"{fname} | {a.get('type','')} | {section} | {desc}")
                 artifacts_info = "\n".join(parts)
 
-            # 1. Architect decides what to do
-            logger.debug(f"{indent}Thinking...")
-            try:
-                # Call architect with a short timeout to avoid hangs if LM is unresponsive
-                with ThreadPoolExecutor(max_workers=1) as ex:
-                    future = ex.submit(
-                        self._call_in_context,
-                        self.architect,
-                        query=task,
-                        data_desc=architect_context,
-                        artifacts_info=artifacts_info,
-                    )
-                    try:
-                        # Increased timeout for local models
-                        decision = future.result(timeout=120)
-                        action = decision.action.upper()
-                        logger.info(f"{indent}Architect Decision: {action}")
-                    except FuturesTimeoutError:
-                        future.cancel()
-                        raise TimeoutError("Architect call timed out")
-            except Exception as e:
-                logger.error(f"{indent}Architect error: {e}")
+            # If we've had too many consecutive CODE failures, force ANSWER
+            if consecutive_code_errors > MAX_CONSECUTIVE_ERRORS:
+                logger.warning(f"{indent}Too many consecutive CODE failures ({consecutive_code_errors}). Forcing ANSWER.")
                 action = "ANSWER"
+            else:
+                # 1. Architect decides what to do
+                logger.debug(f"{indent}Thinking...")
+                try:
+                    # Call architect with a short timeout to avoid hangs if LM is unresponsive
+                    with ThreadPoolExecutor(max_workers=1) as ex:
+                        future = ex.submit(
+                            self._call_in_context,
+                            self.architect,
+                            query=task,
+                            data_desc=architect_context,
+                            artifacts_info=artifacts_info,
+                        )
+                        try:
+                            # Increased timeout for local models
+                            decision = future.result(timeout=120)
+                            action = decision.action.upper()
+                            logger.info(f"{indent}Architect Decision: {action}")
+                        except FuturesTimeoutError:
+                            future.cancel()
+                            raise TimeoutError("Architect call timed out")
+                except Exception as e:
+                    logger.error(f"{indent}Architect error: {e}")
+                    action = "ANSWER"
 
             # 2. Execute Action
             if action == "ANSWER":
@@ -363,6 +371,13 @@ class RLMAgent:
                     output = self.repl.execute(code)
                     log_msg = f"{indent}Execution Output (truncated): {output[:100]}..." if len(output) > 100 else f"{indent}Execution Output: {output}"
                     logger.info(log_msg)
+
+                    # Track consecutive execution errors to avoid infinite loops
+                    if "ExecutionError:" in output:
+                        consecutive_code_errors += 1
+                        logger.debug(f"{indent}CODE execution error. Consecutive errors: {consecutive_code_errors}")
+                    else:
+                        consecutive_code_errors = 0  # Reset on success
 
                     # NEW: Critic refinement loop for visualizations
                     if self._should_refine_visualization(output, code):
@@ -503,6 +518,9 @@ class RLMAgent:
         Uses cumulative feedback where each round builds on previous critiques.
         Follows Paperbanana's three-round refinement pattern.
 
+        If refinement produces execution errors (e.g., RestrictedPython violations),
+        stops refinement and returns the last successful code.
+
         Args:
             task: Original user task
             initial_code: Initial code that generated the visualization
@@ -511,12 +529,14 @@ class RLMAgent:
             indent: Logging indentation string
 
         Returns:
-            Tuple of (final_code, final_output)
+            Tuple of (final_code, final_output) - last successful version
         """
         MAX_ROUNDS = 3
         code = initial_code
         output = initial_output
         cumulative_feedback = ""
+        last_successful_code = initial_code
+        last_successful_output = initial_output
 
         for round_num in range(1, MAX_ROUNDS + 1):
             # Find latest image artifact
@@ -543,6 +563,8 @@ class RLMAgent:
                 logger.info(f"{indent}  Confidence: {critique.confidence:.2f}")
                 if critique.feedback:
                     logger.info(f"{indent}  Final feedback: {critique.feedback[:200]}")
+                last_successful_code = code
+                last_successful_output = output
                 break
 
             # Accumulate feedback
@@ -561,16 +583,30 @@ class RLMAgent:
 
             try:
                 code_pred = self.coder(task=task, context_summary=enhanced_context)
-                code = code_pred.python_code
-                logger.debug(f"{indent}Refined Code (round {round_num}):\n{code}")
-                output = self.repl.execute(code)
+                candidate_code = code_pred.python_code
+                logger.debug(f"{indent}Refined Code (round {round_num}):\n{candidate_code}")
+                candidate_output = self.repl.execute(candidate_code)
+
+                # Check if execution produced an error (ExecutionError in output)
+                if "ExecutionError:" in candidate_output:
+                    logger.warning(f"{indent}Refinement produced execution error. Stopping refinement and returning last successful version.")
+                    logger.debug(f"{indent}Error: {candidate_output[:200]}")
+                    # Don't update code/output - keep last successful version
+                    break
+
+                # Success - update tracking
+                code = candidate_code
+                output = candidate_output
+                last_successful_code = code
+                last_successful_output = output
                 self._add_history(f"Refined Code (round {round_num}):\n{code}", output)
                 self.repl.add_history_entry(code, output, f"refine_{round_num}")
 
                 # Scan for new artifacts after refinement
                 self._scan_and_register_artifacts()
             except Exception as e:
-                logger.error(f"{indent}Refinement failed: {e}")
+                logger.error(f"{indent}Refinement failed: {e}. Stopping refinement and returning last successful version.")
+                # Don't update code/output - keep last successful version
                 break
 
-        return code, output
+        return last_successful_code, last_successful_output
