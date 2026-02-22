@@ -35,7 +35,7 @@ modules:
   # Architect uses reasoning model
   architect:
     provider: ollama
-    model: qwen3.5:cloud
+    model: glm-5:cloud
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
@@ -43,7 +43,7 @@ modules:
   # Coder uses specialized coding model
   coder:
     provider: ollama
-    model: qwen3.5:cloud
+    model: minimax-m2.5:cloud
     pricing:
       input_per_1m: 0.0
       output_per_1m: 0.0
