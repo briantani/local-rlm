@@ -39,8 +39,8 @@ COPY configs/ configs/
 COPY tasks/ tasks/
 COPY README.md ./
 
-# Install the project itself (finalize dependencies)
-RUN uv sync --frozen --no-dev --group repl
+# Install the project itself (finalize dependencies, includes web deps like FastAPI)
+RUN uv sync --frozen --no-dev
 
 # Create runtime directories
 RUN mkdir -p /app/logs /app/runs /app/workspaces /app/.dspy_cache
