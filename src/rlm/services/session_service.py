@@ -7,16 +7,23 @@ API keys are never persisted to disk or database for security.
 Phase 12: Core Library Refactoring
 """
 
+import logging
+import os
 import secrets
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from threading import Lock
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Session:
     """
-    In-memory session with API keys.
+    In-memory session with API keys and workspace.
 
     Security: API keys are stored only in memory and are never persisted.
     When the server restarts or session expires, keys must be re-entered.
@@ -25,6 +32,32 @@ class Session:
     api_keys: dict[str, str] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
     last_accessed: datetime = field(default_factory=datetime.now)
+    workspace_dir: Path | None = None
+    agent: Any = None  # Holds the RLMAgent instance for persistence
+
+    def __post_init__(self):
+        """Initialize workspace directory."""
+        if not self.workspace_dir:
+            # Create a workspace directory in the project's temporary storage
+            # or a dedicated workspaces folder.
+            # Use environment variable for configuration (defaults to 'workspaces')
+            base_dir = Path(os.getenv("RLM_WORKSPACES_DIR", "workspaces"))
+            self.workspace_dir = base_dir / self.session_id
+            self.workspace_dir.mkdir(parents=True, exist_ok=True)
+            (self.workspace_dir / "input").mkdir(exist_ok=True)
+            (self.workspace_dir / "artifacts").mkdir(exist_ok=True)
+
+    @property
+    def input_dir(self) -> Path:
+        """Directory for uploaded input files."""
+        assert self.workspace_dir is not None, "Workspace directory not initialized"
+        return self.workspace_dir / "input"
+
+    @property
+    def artifacts_dir(self) -> Path:
+        """Directory for generated artifacts."""
+        assert self.workspace_dir is not None, "Workspace directory not initialized"
+        return self.workspace_dir / "artifacts"
 
     def set_api_key(self, provider: str, key: str) -> None:
         """
@@ -143,13 +176,33 @@ class SessionService:
         Returns:
             True if session was deleted, False if not found
         """
+        # Copy workspace path before releasing lock to avoid race condition
+        workspace_to_delete = None
+        session_found = False
+
         with self._lock:
             if session_id in self._sessions:
+                session_found = True
                 # Explicitly clear keys before deletion (defense in depth)
-                self._sessions[session_id].clear_all_keys()
+                session = self._sessions[session_id]
+                session.clear_all_keys()
+
+                # Copy workspace dir path for cleanup after releasing lock
+                if session.workspace_dir and session.workspace_dir.exists():
+                    workspace_to_delete = session.workspace_dir
+
                 del self._sessions[session_id]
-                return True
-            return False
+
+        # Cleanup workspace directory outside the lock to avoid blocking
+        if workspace_to_delete:
+            try:
+                shutil.rmtree(workspace_to_delete)
+                logger.info(f"Deleted workspace for session {session_id}")
+            except Exception as e:
+                # Log error but don't fail the deletion
+                logger.error(f"Failed to delete workspace for {session_id}: {e}", exc_info=True)
+
+        return session_found
 
     def set_api_key(self, session_id: str, provider: str, key: str) -> bool:
         """

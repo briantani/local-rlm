@@ -590,7 +590,7 @@ class RLMAgent:
                 # Check if execution produced an error (ExecutionError in output)
                 if "ExecutionError:" in candidate_output:
                     logger.warning(f"{indent}Refinement produced execution error. Stopping refinement and returning last successful version.")
-                    logger.debug(f"{indent}Error: {candidate_output[:200]}")
+                    logger.info(f"{indent}Error details: {candidate_output[:500]}")
                     # Don't update code/output - keep last successful version
                     break
 

@@ -6,7 +6,7 @@ from src.core.config_loader import (
     ProfileConfig,
     get_model_config_for_role,
 )
-from src.core.prompts import build_coder_system_prompt
+from src.core.prompts import build_coder_system_prompt, build_critic_system_prompt
 
 load_dotenv()
 
@@ -100,10 +100,12 @@ def get_lm_for_role(
         output_price_per_1m=model_config.pricing.output_per_1m,
     )
 
-    # For the coder role, add the system prompt with RestrictedPython constraints
+    # For coder and critic roles, add system prompts with RestrictedPython constraints
     system_prompt = None
     if role == "coder":
         system_prompt = build_coder_system_prompt()
+    elif role == "critic":
+        system_prompt = build_critic_system_prompt()
 
     # Create the LM using the existing factory logic
     return _create_lm(

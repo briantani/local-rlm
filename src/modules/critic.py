@@ -22,6 +22,13 @@ class CriticSignature(dspy.Signature):
     5. Aesthetics: Are colors distinct and accessible? Is the layout uncrowded?
 
     If ANY of these are missing or poor, set is_valid to NO and provide specific Python code fixes in the feedback.
+
+    CRITICAL: Code suggestions must be RestrictedPython-safe:
+    - NO import statements (matplotlib, pandas, etc. are pre-loaded as plt, pd)
+    - NO .format() string method - use f-strings: f"{x}" not "{}".format(x)
+    - NO underscore variables (__name__, __file__, __import__)
+    - NO pd.read_csv parameters that trigger imports (e.g., on_bad_lines, error_bad_lines)
+    - Keep suggestions simple: plt.xlabel(), plt.title(), plt.legend(), etc.
     """
     task = dspy.InputField(desc="Original user task/query that required the visualization")
     code = dspy.InputField(desc="Python code that generated the visualization")
@@ -54,7 +61,7 @@ class Critic(dspy.Module):
                 execution_output="Chart saved",
                 previous_feedback="",
                 is_valid="NO",
-                feedback="Missing title, axis labels, and legend. \nFix:\n1. Add plt.title('Sine and Cosine Waves')\n2. Add plt.xlabel('Angle (radians)') and plt.ylabel('Amplitude')\n3. Add plt.legend(['Sine', 'Cosine']) to identify the lines.",
+                feedback="Missing title, axis labels, and legend. \nFix (RestrictedPython-safe):\n1. Add plt.title('Sine and Cosine Waves')\n2. Add plt.xlabel('Angle (radians)') and plt.ylabel('Amplitude')\n3. Add plt.legend(['Sine', 'Cosine'])\nDo NOT suggest import statements or .format() methods.",
                 confidence="0.95"
             ).with_inputs("task", "code", "image_path", "execution_output", "previous_feedback"),
 
@@ -65,7 +72,7 @@ class Critic(dspy.Module):
                 execution_output="Chart saved",
                 previous_feedback="",
                 is_valid="NO",
-                feedback="Good start, but missing axis labels. \nFix:\n1. Add plt.xlabel('Age Group')\n2. Add plt.ylabel('Frequency')\n3. Consider adding plt.grid(axis='y', alpha=0.5) for better readability.",
+                feedback="Good start, but missing axis labels. \nFix:\n1. Add plt.xlabel('Age Group')\n2. Add plt.ylabel('Frequency')\n3. Consider adding plt.grid(axis='y', alpha=0.5) for better readability.\nNote: Only suggest matplotlib functions, no imports or advanced pandas parameters.",
                 confidence="0.9"
             ).with_inputs("task", "code", "image_path", "execution_output", "previous_feedback"),
 

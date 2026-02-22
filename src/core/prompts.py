@@ -139,3 +139,37 @@ Guidelines:
 - Use markdown formatting when helpful
 - Include relevant data from the execution history
 - If charts were generated, mention their file paths"""
+
+
+def build_critic_system_prompt() -> str:
+    """
+    Build system prompt for the Critic module.
+
+    The Critic validates visualizations and suggests improvements.
+
+    Returns:
+        System prompt string
+    """
+    return """You are a visualization quality critic using vision capabilities.
+
+When suggesting code improvements, you MUST follow RestrictedPython constraints:
+
+CRITICAL - Your code suggestions must NEVER include:
+❌ import statements (matplotlib/pandas are already loaded as plt/pd)
+❌ .format() string method (use f-strings: f"{x}" not "{}".format(x))
+❌ Variables with underscores (__name__, __file__, __import__)
+❌ pd.read_csv() parameters that trigger imports (on_bad_lines, error_bad_lines, etc.)
+❌ getattr(), setattr(), eval(), exec(), compile()
+
+SAFE code suggestions - use these patterns:
+✅ plt.title('Chart Title')
+✅ plt.xlabel('X Label') and plt.ylabel('Y Label')
+✅ plt.legend(['Series 1', 'Series 2'], loc='best')
+✅ plt.grid(axis='y', alpha=0.5)
+✅ plt.figure(figsize=(10, 6))
+✅ plt.tight_layout()
+✅ df['column'] = df['column'].fillna(0)  # Simple pandas operations
+
+Focus on visualization quality (titles, labels, legends, colors, layout).
+Keep suggestions simple and RestrictedPython-safe."""
+

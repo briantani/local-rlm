@@ -150,7 +150,9 @@ class TaskService:
         budget_manager = BudgetManager(max_budget=config.budget.max_usd)
 
         # Create run context for artifact management
-        run_context = RunContext()
+        # If session exists, use its workspace as base for runs
+        base_dir = self.session.workspace_dir if self.session and self.session.workspace_dir else None
+        run_context = RunContext(base_dir=base_dir)
         logger.info(f"Artifacts folder: {run_context.artifacts_dir}")
 
         # Configure DSPy with root LM
@@ -188,17 +190,49 @@ class TaskService:
                         "Critic disabled. Use qwen3.5:397b-cloud, qwen3-vl, llava, gemini-2.5-flash, or gpt-4o."
                     )
 
+            # Determine input directory (context)
+            # Prioritize session input directory if available
+            root_dir = context_path
+            if self.session and self.session.workspace_dir:
+                root_dir = self.session.input_dir
+
+            # Check for existing agent to reuse REPL state (memory/variables)
+            repl = None
+            if self.session and self.session.agent and hasattr(self.session.agent, 'repl'):
+                logger.info("Reusing REPL state from existing session agent")
+                repl = self.session.agent.repl
+
+                # Update REPL with new run context using proper method
+                if hasattr(repl, "update_context"):
+                    repl.update_context(run_context, str(root_dir) if root_dir else None)
+                else:
+                    # Fallback to direct updates if method doesn't exist
+                    logger.warning("REPL lacks update_context method, using direct updates")
+                    repl.run_context = run_context
+                    if hasattr(repl, "globals"):
+                        repl.globals["__run_context__"] = run_context
+                        repl.globals["__artifacts_dir__"] = str(run_context.artifacts_dir)
+                        repl.globals["output_dir"] = str(run_context.artifacts_dir)
+                        if root_dir:
+                            repl.globals["__context_dir__"] = str(root_dir)
+                            repl.globals["input_dir"] = str(root_dir)
+
             # Create agent with run context and optional critic
             agent = RLMAgent(
                 max_steps=config.root.max_steps,
                 max_depth=config.root.max_depth,
-                root_dir=context_path,
+                root_dir=root_dir,
                 config=config,
                 budget_manager=budget_manager,
                 run_context=run_context,
                 root_lm=lm,
                 critic=critic,  # Pass critic (may be None)
+                repl=repl,      # Pass existing REPL if available
             )
+
+            # Persist agent back to session for next turn
+            if self.session:
+                self.session.agent = agent
 
             # Track execution history for callbacks
             execution_history: list[StepInfo] = []

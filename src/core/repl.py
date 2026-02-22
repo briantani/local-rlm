@@ -338,6 +338,31 @@ class PythonREPL:
         )
         return output
 
+    def update_context(self, run_context: "RunContext", context_dir: str | None = None) -> None:
+        """Update run context and directories for next execution.
+
+        This is used when reusing a REPL across multiple agent runs to ensure
+        the output directory and context directories are updated properly.
+
+        Args:
+            run_context: New run context with updated artifact directory
+            context_dir: Optional updated context directory
+        """
+        self.run_context = run_context
+        if context_dir is not None:
+            self.context_dir = context_dir
+
+        # Update directory-related globals
+        self.globals["__run_context__"] = run_context
+        self.globals["__artifacts_dir__"] = str(run_context.artifacts_dir)
+        self.globals["output_dir"] = str(run_context.artifacts_dir)
+
+        if context_dir:
+            self.globals["__context_dir__"] = context_dir
+            self.globals["input_dir"] = context_dir
+
+        logger.debug(f"Updated REPL context: artifacts={run_context.artifacts_dir}, input={context_dir}")
+
     def check_for_final(self, output: str) -> str | None:
         """Check for FINAL() termination and extract answer.
 

@@ -5,7 +5,10 @@ Handles session creation and API key management.
 API keys are stored only in memory, never persisted.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+from datetime import datetime
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from pydantic import BaseModel, Field
 
 from src.rlm.services import SessionService
@@ -170,3 +173,125 @@ async def delete_session(
         )
 
     return {"success": True, "message": "Session deleted and all API keys cleared from memory."}
+
+
+@router.post("/{session_id}/files", status_code=status.HTTP_201_CREATED)
+async def upload_file(
+    session_id: str,
+    file: UploadFile = File(...),
+    session_service: SessionService = Depends(get_session_service),
+):
+    """
+    Upload a file to the session's input directory.
+
+    These files will be available to the REPL coder as context.
+
+    Security:
+    - Filename sanitization (prevents path traversal)
+    - File size limit (100MB default)
+    - No executable validation (user responsibility)
+    """
+    import re
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    session = session_service.get_session(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session not found: {session_id}",
+        )
+
+    # Security: Sanitize filename to prevent path traversal
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filename is required"
+        )
+
+    # Remove any path components and sanitize
+    safe_filename = Path(file.filename).name  # Gets just the filename, strips paths
+    safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', safe_filename)
+
+    # Additional path traversal check
+    if '..' in safe_filename or safe_filename.startswith(('/', '\\')):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename: path traversal detected"
+        )
+
+    if not safe_filename or safe_filename in ('.', '..'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename"
+        )
+
+    # Ensure input directory exists (in case it was deleted)
+    session.input_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = session.input_dir / safe_filename
+
+    # Security: File size limit (100MB default, configurable via env)
+    MAX_FILE_SIZE = int(os.getenv("RLM_MAX_UPLOAD_SIZE", 100 * 1024 * 1024))  # 100MB
+
+    try:
+        file_size = 0
+        with open(file_path, "wb") as f:
+            while content := await file.read(1024 * 1024):  # 1MB chunks
+                file_size += len(content)
+                if file_size > MAX_FILE_SIZE:
+                    # Delete partial file
+                    f.close()
+                    if file_path.exists():
+                        file_path.unlink()
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"File too large. Maximum size: {MAX_FILE_SIZE / (1024*1024):.0f}MB"
+                    )
+                f.write(content)
+
+        logger.info(f"Uploaded file {safe_filename} ({file_size} bytes) to session {session_id}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to upload file {safe_filename}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload file: {str(e)}",
+        )
+
+    return {
+        "filename": safe_filename,
+        "original_filename": file.filename,
+        "size": file_size,
+        "message": "File uploaded successfully"
+    }
+
+
+@router.get("/{session_id}/files")
+async def list_files(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+):
+    """
+    List files uploaded to the session.
+    """
+    session = session_service.get_session(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session not found: {session_id}",
+        )
+
+    files = []
+    if session.input_dir.exists():
+        for f in session.input_dir.iterdir():
+            if f.is_file():
+                files.append({
+                    "name": f.name,
+                    "size": f.stat().st_size,
+                    "created_at": datetime.fromtimestamp(f.stat().st_ctime).isoformat()
+                })
+    return {"files": files}
