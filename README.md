@@ -51,6 +51,25 @@ echo "GEMINI_API_KEY=your-key" > .env
 uv run rlm "Summarize research.pdf" --config configs/cost-effective.yaml --context ./documents
 ```
 
+### Run with Docker (Web Interface)
+
+Run the full web interface and agent in a container:
+
+```bash
+# 1. Set API keys in .env file
+echo "GEMINI_API_KEY=your-key" > .env
+
+# 2. Start the container
+docker compose up -d
+
+# 3. Open http://localhost:8000
+```
+
+To view logs:
+```bash
+docker compose logs -f
+```
+
 ## Configuration Profiles
 
 | Profile | Use Case | Cost |

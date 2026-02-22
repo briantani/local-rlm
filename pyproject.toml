@@ -3,7 +3,7 @@ name = "local-rlm"
 version = "0.1.0"
 description = "Recursive Language Model (RLM) Agent - An implementation of MIT CSAIL's recursive problem-solving architecture using DSPy. Solves complex tasks by generating and executing Python code in a stateful sandbox with support for delegation to parallel sub-agents."
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     # Core Framework
     "dspy-ai>=3.0.4",

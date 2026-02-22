@@ -1,0 +1,39 @@
+services:
+  rlm-web:
+    build: .
+    image: local-rlm:latest
+    container_name: local-rlm
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent runs/artifacts
+      - ./runs:/app/runs
+      # Persistent logs
+      - ./logs:/app/logs
+      # Persistent workspaces for session files
+      - ./workspaces:/app/workspaces
+      # Persistent DSPy cache
+      - ./.dspy_cache:/app/.dspy_cache
+      # Persistent DB/data directory
+      - ./data:/app/data
+      # Mount configs if you want to edit them live
+      - ./configs:/app/configs:ro
+    environment:
+      # Set your API keys here or use a .env file
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Configure logging level
+      - LOG_LEVEL=INFO
+    extra_hosts:
+      # Allow access to host machine's Ollama if running locally
+      - "host.docker.internal:host-gateway"
+
+    # Healthcheck to ensure service is up
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
