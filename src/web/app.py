@@ -5,6 +5,7 @@ Creates and configures the FastAPI application with all routes and middleware.
 """
 
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -20,6 +21,10 @@ from src.web.database import init_db
 from src.core.dspy_config import configure_dspy
 
 logger = logging.getLogger(__name__)
+
+# Generate a unique startup ID that changes with each server restart
+# This allows clients to detect server restarts and clear stale sessions
+_server_startup_id = secrets.token_hex(8)
 
 
 @asynccontextmanager
@@ -78,11 +83,11 @@ def create_app() -> FastAPI:
     app.include_router(stream.router, tags=["WebSocket"])
 
     # Import chat, export, and share routers
-    from src.web.routes import chat, export, share, templates
+    from src.web.routes import chat, export, share, templates as templates_routes
     app.include_router(chat.router)
     app.include_router(export.router)
     app.include_router(share.router)
-    app.include_router(templates.router)
+    app.include_router(templates_routes.router)
 
     # Mount static files (for Phase 14)
     static_path = Path(__file__).parent / "static"
@@ -96,20 +101,19 @@ def create_app() -> FastAPI:
     # Initialize services for routes
     services = get_services()
 
-    @app.get("/", tags=["UI"])
-    async def index(request: Request):
-        """Render the main UI page (simplified chat interface)."""
-        return templates.TemplateResponse(request, "index.html")
+    # Mount React Frontend SPA (ensure this is added last to not shadow API routes)
+    static_path = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
-    @app.get("/configs", tags=["UI"])
-    async def configs_list(request: Request):
-        """Render the configurations list page."""
-        return templates.TemplateResponse(request, "configs.html")
+    # In Docker production, it will be mapped/copied here
+    if not static_path.exists() and Path("/app/static").exists():
+        static_path = Path("/app/static")
 
-    @app.get("/configs/estimate", tags=["UI"])
-    async def cost_estimator(request: Request):
-        """Render the cost estimator page."""
-        return templates.TemplateResponse(request, "cost_estimator.html")
+    if static_path.exists():
+        app.mount("/", StaticFiles(directory=str(static_path), html=True), name="frontend")
+    else:
+        @app.get("/", tags=["UI"])
+        async def index():
+            return {"message": "Frontend not built. Run `npm run build` in frontend/ directory."}
 
     @app.get("/configs/compare", tags=["UI"])
     async def configs_compare(request: Request, config: list[str] = []):
@@ -231,8 +235,12 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["Health"])
     async def health_check():
-        """Health check endpoint."""
-        return {"status": "healthy", "version": "0.1.0"}
+        """Health check endpoint with startup ID for restart detection."""
+        return {
+            "status": "healthy",
+            "version": "0.1.0",
+            "startup_id": _server_startup_id  # Changes on each server restart
+        }
 
     return app
 

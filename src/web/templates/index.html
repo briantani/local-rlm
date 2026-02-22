@@ -71,6 +71,41 @@
 
         <!-- Main Chat Area -->
         <div class="flex-1 flex flex-col min-w-0">
+            <!-- Output Canvas Header -->
+            <div class="border-b border-gray-200 bg-gray-50 px-6 py-3 flex items-center justify-between">
+                <div class="text-sm font-medium text-gray-700">
+                    <span x-show="!isRunning && taskId">Task Results</span>
+                    <span x-show="isRunning">Running...</span>
+                    <span x-show="!isRunning && !taskId" class="text-gray-400">Ready</span>
+                </div>
+                <div class="flex items-center space-x-3" x-show="taskId && !isRunning">
+                    <!-- Export Dropdown -->
+                    <div class="relative" @click.away="openExportMenu = false">
+                        <button @click="openExportMenu = !openExportMenu"
+                                class="text-sm px-3 py-1.5 bg-green-50 border border-green-300 rounded hover:bg-green-100 flex items-center space-x-1 hover:shadow transition">
+                            <span class="text-green-700 font-medium">✓ Results Ready</span>
+                        </button>
+                        <div x-show="openExportMenu" class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded shadow-lg z-50">
+                            <div class="py-1">
+                                <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase border-b">Export as:</div>
+                                <button @click.prevent="exportTask('markdown', taskId); openExportMenu = false" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center space-x-2">
+                                    <span>📄 Markdown</span>
+                                    <span class="text-xs text-gray-400">.md</span>
+                                </button>
+                                <button @click.prevent="exportTask('json', taskId); openExportMenu = false" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center space-x-2">
+                                    <span>{ } JSON</span>
+                                    <span class="text-xs text-gray-400">.json</span>
+                                </button>
+                                <button @click.prevent="exportTask('pdf', taskId); openExportMenu = false" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center space-x-2">
+                                    <span>📕 PDF</span>
+                                    <span class="text-xs text-gray-400">.pdf</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Messages Area -->
             <div id="messages" class="flex-1 overflow-y-auto p-6 space-y-6">
 
@@ -102,6 +137,18 @@
                                 </svg>
                                 <span>Details: <span x-text="msg.details?.step_count || 0"></span> steps, $<span x-text="msg.details?.total_cost?.toFixed(4) || '0.00'"></span></span>
                             </button>
+
+                            <!-- Export menu -->
+                            <div class="inline-block ml-3 relative" x-show="msg.showDetails || (taskId && !isRunning)">
+                                <button @click="msg.showExport = !msg.showExport" class="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 border rounded">
+                                    Export
+                                </button>
+                                <div x-show="msg.showExport" @click.away="msg.showExport = false" class="absolute right-0 mt-2 w-40 bg-white border rounded shadow z-40">
+                                    <a @click.prevent="exportTask('markdown', msg.details?.task_id || taskId)" href="#" class="block px-3 py-2 text-sm hover:bg-gray-100">Download Markdown</a>
+                                    <a @click.prevent="exportTask('json', msg.details?.task_id || taskId)" href="#" class="block px-3 py-2 text-sm hover:bg-gray-100">Download JSON</a>
+                                    <a @click.prevent="exportTask('pdf', msg.details?.task_id || taskId)" href="#" class="block px-3 py-2 text-sm hover:bg-gray-100">Download PDF</a>
+                                </div>
+                            </div>
 
                             <div x-show="msg.showDetails" class="mt-3 space-y-2">
                                 <template x-for="(step, sIdx) in (msg.details?.execution_history || [])" :key="sIdx">
@@ -219,6 +266,7 @@ function rlmChat() {
         taskId: null,
         isRunning: false,
         statusMessage: '',
+        openExportMenu: false,
         
         // Chat History
         messages: [],
@@ -227,14 +275,84 @@ function rlmChat() {
         ws: null,
 
         async init() {
+            console.log('[Init] Starting page initialization...');
+            await this.checkServerVersion();
+            console.log('[Init] Server version check complete');
+            
             await this.initSession();
+            console.log('[Init] Session initialization complete. sessionId:', this.sessionId);
+            
             await this.loadConfigs();
+            console.log('[Init] Configs loaded');
+            
             await this.loadFiles();
+            console.log('[Init] Files loaded. Count:', this.files.length);
+        },
+
+        async checkServerVersion() {
+            console.log('[Server] Checking server health and startup_id...');
+            try {
+                const response = await fetch('/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    const currentStartupId = data.startup_id;
+                    const storedStartupId = localStorage.getItem('rlm_server_startup_id');
+                    const storedSessionId = localStorage.getItem('rlm_session_id');
+                    
+                    console.log('[Server] Current startup_id:', currentStartupId);
+                    console.log('[Server] Stored startup_id:', storedStartupId);
+                    console.log('[Server] Stored session_id exists:', !!storedSessionId);
+                    
+                    // Clear session if:
+                    // 1. startup_id changed (server restart), OR
+                    // 2. We have a session but no startup_id stored (old session from before startup_id feature)
+                    if ((storedStartupId && storedStartupId !== currentStartupId) ||
+                        (storedSessionId && !storedStartupId)) {
+                        console.info('[Server] Clearing stale session', {
+                            reason: storedStartupId ? 'startup_id changed' : 'old session without startup_id',
+                            previousStartupId: storedStartupId,
+                            currentStartupId: currentStartupId
+                        });
+                        localStorage.removeItem('rlm_session_id');
+                    }
+                    
+                    // Update stored startup ID
+                    localStorage.setItem('rlm_server_startup_id', currentStartupId);
+                    console.log('[Server] Updated stored startup_id');
+                }
+            } catch (e) {
+                console.warn('[Server] Failed to check server health:', e);
+            }
+        },
+
+        async exportTask(format, explicitTaskId) {
+            const tid = explicitTaskId || this.taskId;
+            if (!tid) return alert('No task id available for export');
+            const url = `/api/tasks/${tid}/export/${format}`;
+            try {
+                const res = await fetch(url, { method: 'GET' });
+                if (!res.ok) throw new Error('Export failed');
+
+                const blob = await res.blob();
+                const filename = res.headers.get('content-disposition')?.split('filename=')[1] || `task_${tid}.${format}`;
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename.replace(/"/g, '');
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(link.href);
+            } catch (e) {
+                alert('Export failed: ' + e.message);
+            }
         },
 
         async initSession() {
             let sessionId = localStorage.getItem('rlm_session_id');
+            console.log('[Session] Retrieved from localStorage:', sessionId);
+            
             if (!sessionId) {
+                console.log('[Session] No session found, creating new...');
                 try {
                     const response = await fetch('/api/sessions', {
                         method: 'POST',
@@ -243,13 +361,20 @@ function rlmChat() {
                     if (response.ok) {
                         const data = await response.json();
                         sessionId = data.session_id;
+                        console.log('[Session] Created new session:', sessionId);
                         localStorage.setItem('rlm_session_id', sessionId);
+                    } else {
+                        console.error('[Session] Failed to create session:', response.status, response.statusText);
                     }
                 } catch (e) {
-                    console.error('Failed to create session:', e);
+                    console.error('[Session] Exception creating session:', e);
                 }
+            } else {
+                console.log('[Session] Using existing session:', sessionId);
             }
+            
             this.sessionId = sessionId;
+            console.log('[Session] this.sessionId set to:', this.sessionId, 'type:', typeof this.sessionId);
         },
 
         async loadConfigs() {
@@ -276,15 +401,44 @@ function rlmChat() {
         },
 
         async loadFiles() {
-            if (!this.sessionId) return;
+            console.log('[Files] loadFiles() called. sessionId:', this.sessionId, 'type:', typeof this.sessionId);
+            
+            if (!this.sessionId) {
+                console.warn('[Files] No session ID available for loading files');
+                return;
+            }
+            
             try {
-                const response = await fetch(`/api/sessions/${this.sessionId}/files`);
+                const url = `/api/sessions/${this.sessionId}/files`;
+                console.log('[Files] Fetching from URL:', url);
+                
+                const response = await fetch(url);
+                console.log('[Files] Response status:', response.status, response.statusText);
+                
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('[Files] Successfully loaded', data.files?.length || 0, 'files');
                     this.files = data.files || [];
+                } else if (response.status === 404) {
+                    // Session doesn't exist - clear it and create a new one
+                    console.warn('[Files] Session does not exist (404). Clearing and creating new session...');
+                    localStorage.removeItem('rlm_session_id');
+                    this.sessionId = null;
+                    await this.initSession();
+                    // Retry loading files with the new session
+                    await this.loadFiles();
+                } else {
+                    console.error('[Files] Failed to load files. Status:', response.status, {
+                        url: url,
+                        status: response.status,
+                        statusText: response.statusText
+                    });
                 }
             } catch (e) {
-                console.error('Failed to load files:', e);
+                console.error('[Files] Exception loading files:', {
+                    message: e.message,
+                    stack: e.stack
+                });
             }
         },
 
@@ -439,11 +593,15 @@ function rlmChat() {
                     break;
                 case 'complete':
                     // Add final answer to messages
+                    const answerContent = update.data.answer || 
+                        `**Task completed** in ${update.data.duration_seconds?.toFixed(1) || 0}s with ${update.data.step_count || 0} steps.\n\n` +
+                        `Cost: $${update.data.total_cost?.toFixed(4) || '0.00'}`;
                     this.messages.push({
                         role: 'assistant',
-                        content: update.data.answer,
+                        content: answerContent,
                         details: update.data,
-                        showDetails: false
+                        showDetails: false,
+                        taskId: this.taskId  // Store taskId in message for export reference
                     });
                     this.isRunning = false;
                     this.currentSteps = [];

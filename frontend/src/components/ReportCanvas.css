@@ -1,0 +1,135 @@
+.report-header {
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--glass-bg);
+}
+
+.report-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-title h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.report-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.action-btn span {
+  font-weight: 600;
+}
+
+.report-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  background-color: var(--bg-primary);
+}
+
+.report-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-tertiary);
+  text-align: center;
+  gap: 12px;
+}
+
+.empty-icon-subtle {
+  opacity: 0.2;
+}
+
+.report-empty p {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.empty-subtext {
+  font-size: 12px;
+}
+
+/* Custom Prose styling for markdown inside the canvas */
+.report-markdown {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.report-markdown h1 { font-size: 24px; margin: 24px 0 16px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; }
+.report-markdown h2 { font-size: 20px; margin: 20px 0 12px; }
+.report-markdown h3 { font-size: 16px; margin: 16px 0 8px; }
+
+.report-markdown p { margin-bottom: 16px; }
+
+.report-markdown ul,
+.report-markdown ol { margin-bottom: 16px; padding-left: 20px; }
+.report-markdown li { margin-bottom: 4px; }
+
+.report-markdown code {
+  background-color: rgba(0,0,0,0.3);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #7ee787;
+}
+
+.report-markdown pre {
+  background-color: #0d1117;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  border: 1px solid rgba(255,255,255,0.05);
+  margin-bottom: 16px;
+}
+
+.report-markdown pre code {
+  background-color: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.report-markdown blockquote {
+  border-left: 4px solid var(--accent-primary);
+  padding-left: 16px;
+  margin-left: 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.report-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+
+.report-markdown th,
+.report-markdown td {
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.report-markdown th {
+  background-color: var(--glass-bg);
+  font-weight: 600;
+}

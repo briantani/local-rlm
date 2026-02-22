@@ -7,6 +7,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      # Live source code (development - no rebuild needed for code changes)
+      - ./src:/app/src
       # Persistent runs/artifacts
       - ./runs:/app/runs
       # Persistent logs
@@ -26,6 +28,8 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       # Configure logging level
       - LOG_LEVEL=INFO
+    # Development mode: mount source and auto-reload on changes
+    entrypoint: python -m uvicorn src.web.app:app --host 0.0.0.0 --port 8000 --reload
     extra_hosts:
       # Allow access to host machine's Ollama if running locally
       - "host.docker.internal:host-gateway"
@@ -37,3 +41,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  rlm-frontend:
+    image: node:20
+    container_name: local-rlm-frontend
+    working_dir: /app/frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app/frontend
+    command: npm run dev -- --host 0.0.0.0

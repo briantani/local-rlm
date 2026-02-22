@@ -175,8 +175,14 @@ def _create_lm(
             if not target_model.startswith("ollama/"):
                 target_model = f"ollama/{target_model}"
 
+            # Get Ollama base URL from environment, default to host.docker.internal for Docker
+            # For local development: use http://localhost:11434
+            # For Docker: use http://host.docker.internal:11434 (macOS/Windows Docker Desktop)
+            # Override with OLLAMA_BASE_URL environment variable if needed
+            ollama_base = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+            
             # Disable caching for Ollama to ensure fresh responses
-            lm = dspy.LM(target_model, api_base="http://localhost:11434", cache=False, **extra_kwargs)
+            lm = dspy.LM(target_model, api_base=ollama_base, cache=False, **extra_kwargs)
 
         case _:
             raise ValueError(f"Unsupported provider: {provider}")
