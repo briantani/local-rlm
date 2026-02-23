@@ -14,6 +14,7 @@ class ArchitectSignature(dspy.Signature):
     - Creating images, charts, graphs, plots, or any visual output
     - Generating reports with embedded visualizations
     - Data processing, research analysis, or complex reasoning with outputs
+    - Processing files (like CSVs, JSONs, texts) mentioned in the query
 
     ANSWER: Only when the complete answer is already visible in the execution history.
     If unsure or task involves any data processing, generation, or visualization, choose CODE.
@@ -141,7 +142,8 @@ class Architect(dspy.Module):
         # No explicit action found - use heuristic keyword matching
         # Check for patterns indicating CODE
         code_keywords = ["CALCULATE", "COMPUTE", "PYTHON", "SCRIPT", "EXECUTE",
-                        "RUN CODE", "PROGRAM", "ALGORITHM", "ANALYZE"]
+                        "RUN CODE", "PROGRAM", "ALGORITHM", "ANALYZE",
+                        "DATA", "CSV", "FILE", "PLOT", "CHART", "VISUALIZE", "VISUALIZATION"]
         if any(word in text for word in code_keywords):
             return "CODE"
 

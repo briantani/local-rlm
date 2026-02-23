@@ -46,6 +46,11 @@ class CodeExecutor:
         if not code.strip():
             return "No code to execute"
 
+        # Auto-remove explicit import statements so RestrictedPython doesn't crash
+        # (since we already pre-load the necessary modules).
+        import re
+        code = re.sub(r'^(?:from\s+[\w\.]+\s+)?import\s+.*$', '', code, flags=re.MULTILINE)
+
         # Basic sanitization (RestrictedPython handles most)
         forbidden = ["os.system", "subprocess", "__builtins__"]
         for pattern in forbidden:
@@ -99,10 +104,9 @@ class CodeExecutor:
                     except Exception:
                         pass  # Not an expression
 
-            # Copy variables back to globals
+            # Copy variables back to globals (allowing underscore prefixes like pandas _str internal variables)
             for key, value in locals_dict.items():
-                if not key.startswith("_"):
-                    globals_dict[key] = value
+                globals_dict[key] = value
 
             if not output.strip():
                 output = "Code executed successfully (no output)"

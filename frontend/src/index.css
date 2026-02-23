@@ -146,3 +146,14 @@ h1, h2, h3, h4 {
   box-shadow: -10px 0 30px rgba(0, 0, 0, 0.2);
   z-index: 10;
 }
+
+/* Allow the canvas to expand freely when used outside the main 3-pane layout */
+.app-container > div > .report-canvas {
+  width: 100%;
+  max-width: 900px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  margin: 20px 0;
+  height: calc(100vh - 120px);
+}

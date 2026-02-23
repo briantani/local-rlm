@@ -110,6 +110,8 @@ class SandboxGuards:
         # Add print collector
         restricted["_print_"] = PrintCollector
 
+        import warnings
+
         # Add safe builtins
         safe_builtins = {
             # Types
@@ -160,6 +162,9 @@ class SandboxGuards:
             "ord": ord,
             "chr": chr,
             "ascii": ascii,
+            # Built-in Imports for library loading
+            "__import__": __import__,
+            "__name__": __name__,
             # Exceptions
             "Exception": Exception,
             "ValueError": ValueError,
@@ -175,6 +180,7 @@ class SandboxGuards:
             "False": False,
             "Ellipsis": Ellipsis,
             "NotImplemented": NotImplemented,
+            "warnings": warnings,
         }
         restricted.update(safe_builtins)
 

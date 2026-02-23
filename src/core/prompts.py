@@ -59,6 +59,8 @@ PRE-LOADED MODULES (use directly):
 - Path: pathlib.Path for file paths
 - Counter, defaultdict: collections
 - StringIO: io.StringIO
+- statsmodels, sm: Statistical models
+- ExponentialSmoothing, ARIMA: Time-series forecasting
 
 PRE-LOADED FUNCTIONS:
 - search_web(query): Search the web

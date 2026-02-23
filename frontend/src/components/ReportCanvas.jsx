@@ -20,7 +20,7 @@ export default function ReportCanvas({ reportHtml, taskId }) {
     // we can simply open the backend's export PDF route or a quick blob print out.
     // Given the prompt, let's open the markdown endpoint in a new tab for now.
     // Or, we render the HTML to a blob and open it.
-    const url = `/api/tasks/${taskId}/export/markdown`;
+    const url = `/report/${taskId}`;
     window.open(url, '_blank');
   };
 

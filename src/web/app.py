@@ -9,7 +9,8 @@ import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -94,6 +95,12 @@ def create_app() -> FastAPI:
     if static_path.exists():
         app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
+    # Mount workspaces directory to serve generated files and images
+    workspaces_path = Path(__file__).parent.parent.parent / "workspaces"
+    if not workspaces_path.exists():
+        workspaces_path.mkdir(parents=True, exist_ok=True)
+    app.mount("/workspaces", StaticFiles(directory=str(workspaces_path)), name="workspaces")
+
     # Setup templates
     templates_path = Path(__file__).parent / "templates"
     templates = Jinja2Templates(directory=str(templates_path))
@@ -101,7 +108,7 @@ def create_app() -> FastAPI:
     # Initialize services for routes
     services = get_services()
 
-    # Mount React Frontend SPA (ensure this is added last to not shadow API routes)
+    # Mount React Frontend SPA
     static_path = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
     # In Docker production, it will be mapped/copied here
@@ -109,7 +116,20 @@ def create_app() -> FastAPI:
         static_path = Path("/app/static")
 
     if static_path.exists():
-        app.mount("/", StaticFiles(directory=str(static_path), html=True), name="frontend")
+        # Mount the static directory for assets
+        app.mount("/assets", StaticFiles(directory=str(static_path / "assets")), name="frontend-assets")
+
+        # Serve the index.html for all SPA routes (React Router fallback)
+        @app.get("/{full_path:path}", tags=["UI"])
+        async def serve_spa(full_path: str):
+            # Ignore API and workspaces routes
+            if full_path.startswith("api/") or full_path.startswith("workspaces/") or full_path.startswith("static/"):
+                raise HTTPException(status_code=404, detail="Not Found")
+
+            index_path = static_path / "index.html"
+            if index_path.exists():
+                return HTMLResponse(content=index_path.read_text(), status_code=200)
+            return {"message": "Frontend index.html not found."}
     else:
         @app.get("/", tags=["UI"])
         async def index():

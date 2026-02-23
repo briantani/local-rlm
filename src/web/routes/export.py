@@ -82,6 +82,13 @@ async def export_markdown(task_id: str):
         for model, cost in result['model_breakdown'].items():
             markdown += f"- **{model}**: ${cost:.4f}\n"
 
+    # Replace relative workspaces/ image URLs with absolute URLs based on the host config
+    import os
+    # Default to localhost if HOST_URL is not set externally
+    host_url = os.environ.get("HOST_URL", "http://localhost:8000")
+    import re
+    markdown = re.sub(r'\]\(/?workspaces/([^)]+)\)', rf']({host_url}/workspaces/\1)', markdown)
+
     # Return as downloadable file
     return Response(
         content=markdown,
@@ -194,9 +201,16 @@ async def export_pdf(task_id: str):
         for model, cost in result['model_breakdown'].items():
             markdown_content += f"- **{model}**: ${cost:.4f}\n"
 
+    # Replace relative /workspaces/ image URLs with absolute URLs for the PDF renderer
+    # WeasyPrint needs absolute URLs to fetch the images
+    import re
+    # We'll use http://localhost:8000 for server-side PDF rendering resolution
+    base_url = "http://localhost:8000"
+    html_markdown_content = re.sub(r'\]\(/?workspaces/([^)]+)\)', rf']({base_url}/workspaces/\1)', markdown_content)
+
     # Convert Markdown to HTML
     html_content = markdown.markdown(
-        markdown_content,
+        html_markdown_content,
         extensions=['fenced_code', 'tables', 'nl2br']
     )
 

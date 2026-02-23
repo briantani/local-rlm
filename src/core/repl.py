@@ -65,10 +65,14 @@ except ImportError:
 try:
     import statsmodels
     import statsmodels.api as sm
+    from statsmodels.tsa.holtwinters import ExponentialSmoothing
+    from statsmodels.tsa.arima.model import ARIMA
     HAS_STATSMODELS = True
 except ImportError:
     statsmodels = None
     sm = None
+    ExponentialSmoothing = None
+    ARIMA = None
     HAS_STATSMODELS = False
 
 # Document processing libraries
@@ -266,7 +270,12 @@ class PythonREPL:
             })
 
         if HAS_STATSMODELS:
-            restricted.update({"statsmodels": statsmodels, "sm": sm})
+            restricted.update({
+                "statsmodels": statsmodels,
+                "sm": sm,
+                "ExponentialSmoothing": ExponentialSmoothing,
+                "ARIMA": ARIMA
+            })
 
         # Add document processing libraries
         if HAS_PDFPLUMBER:
