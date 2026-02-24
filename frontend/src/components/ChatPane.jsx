@@ -161,10 +161,20 @@ export default function ChatPane({ sessionId, selectedConfig, onReportGenerated 
             </div>
           </div>
         ))}
+        {currentSteps.map((step, idx) => {
+          const isLast = idx === currentSteps.length - 1;
+          return (
+            <LogBubble
+              key={idx}
+              step={step}
+              stepNumber={idx + 1}
+              statusMessage={isLast ? statusMessage : 'Completed'}
+              isRunning={isLast ? isRunning : false}
+            />
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
-
-      <LogBubble steps={currentSteps} statusMessage={statusMessage} isRunning={isRunning} />
 
       <div className="chat-input-area">
         <form onSubmit={handleSubmit} className="chat-form">

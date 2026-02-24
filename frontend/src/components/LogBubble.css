@@ -1,19 +1,13 @@
 .log-bubble {
-  position: absolute;
-  bottom: 90px;
-  left: 20px;
-  right: 20px;
-  background-color: var(--glass-bg);
+  background-color: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   overflow: hidden;
-  z-index: 20;
-  animation: slideUp 0.3s ease;
-  max-height: 250px;
   display: flex;
   flex-direction: column;
+  margin: 10px 0;
+  flex-shrink: 0;
 }
 
 @keyframes slideUp {

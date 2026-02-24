@@ -1,41 +1,51 @@
+import { useState, useEffect } from 'react';
 import './LogBubble.css';
-import { Loader2, Terminal, Code2, Play } from 'lucide-react';
+import { Loader2, Terminal, Code2, Play, ChevronDown, ChevronRight } from 'lucide-react';
 
-export default function LogBubble({ steps, statusMessage, isRunning }) {
-  if (!isRunning && steps.length === 0) return null;
+export default function LogBubble({ step, stepNumber, statusMessage, isRunning }) {
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  // The latest step
-  const lastStep = steps[steps.length - 1];
-  const stepCount = steps.length;
+  useEffect(() => {
+    if (isRunning) {
+      setIsExpanded(true);
+    }
+  }, [isRunning]);
+
+  if (!step) return null;
 
   return (
     <div className="log-bubble">
-      <div className="log-bubble-header">
+      <div
+        className="log-bubble-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+      >
         <div className="log-bubble-status">
+          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           {isRunning ? <Loader2 size={16} className="spinner" /> : <Terminal size={16} />}
-          <span>{statusMessage || 'Thinking...'}</span>
+          <span>{statusMessage || step.action || 'Executing...'}</span>
         </div>
         <div className="log-bubble-step-count">
-          {stepCount > 0 ? `Step ${stepCount}` : ''}
+          Step {stepNumber}
         </div>
       </div>
 
-      {lastStep && (
+      {isExpanded && (
         <div className="log-bubble-content">
            <div className="step-action">
-             <Code2 size={14} /> Action: {lastStep.action}
+             <Code2 size={14} /> Action: {step.action}
            </div>
 
-           {lastStep.code && (
+           {step.code && (
              <div className="step-code">
-               <pre><code>{lastStep.code}</code></pre>
+               <pre><code>{step.code}</code></pre>
              </div>
            )}
 
-           {lastStep.output && (
+           {step.output && (
              <div className="step-output">
                <div className="output-label"><Play size={12} /> Output</div>
-               <pre><code>{lastStep.output}</code></pre>
+               <pre><code>{step.output}</code></pre>
              </div>
            )}
         </div>
